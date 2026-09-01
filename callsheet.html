@@ -8,9 +8,9 @@
 <meta name="theme-color" content="#2f6f4f">
 <style>
 :root{--bg:#f7f7f5;--card:#fff;--ink:#1c1b19;--mute:#6b6862;--line:#e3e0da;
- --accent:#2f6f4f;--accent-soft:#e6f0ea;--bad:#8c2f2f;--bad-soft:#fbe9e9;color-scheme:light dark}
+ --accent:#2f6f4f;--accent-soft:#e6f0ea;--bad:#8c2f2f;--bad-soft:#fbe9e9;--lock:#4a4f8a;--lock-soft:#e9eaf5;color-scheme:light dark}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#16171a;--card:#1e2024;--ink:#eceae6;
- --mute:#9d9a94;--line:#32353b;--accent:#7fc79f;--accent-soft:#1f2f27;--bad:#e88b8b;--bad-soft:#301e1e}}
+ --mute:#9d9a94;--line:#32353b;--accent:#7fc79f;--accent-soft:#1f2f27;--bad:#e88b8b;--bad-soft:#301e1e;--lock:#a8adde;--lock-soft:#22243a}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
  padding-bottom:env(safe-area-inset-bottom)}
@@ -34,10 +34,12 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 .note{font-size:14px;padding:10px 12px;border-radius:8px;margin:10px 0}
 .note.ok{background:var(--accent-soft);color:var(--accent)}
 .note.bad{background:var(--bad-soft);color:var(--bad)}
+.note.lock{background:var(--lock-soft);color:var(--lock)}
 video,canvas.shot{width:100%;border-radius:10px;background:#000;display:block}
 .hidden{display:none}
 .stack{display:grid;gap:9px}
 .meta{color:var(--mute);font-size:13px}
+.k{font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -57,6 +59,7 @@ video,canvas.shot{width:100%;border-radius:10px;background:#000;display:block}
 
   <div class="card">
     <h2>Proof photo</h2>
+    <div id="lockedNote" class="note lock hidden">This report is locked. The photo was already taken, so its funders are final.</div>
     <div id="camWrap">
       <video id="v" playsinline autoplay muted class="hidden"></video>
       <canvas id="c" class="shot hidden"></canvas>
@@ -65,8 +68,9 @@ video,canvas.shot{width:100%;border-radius:10px;background:#000;display:block}
         <button id="snap" class="hidden">Capture</button>
         <button id="again" class="ghost hidden">Retake</button>
         <button id="save" class="ghost hidden">Save / share photo</button>
+        <button id="lockManual" class="ghost hidden">Lock report without in-app photo</button>
       </div>
-      <p class="meta" id="camNote">Caption with date, session cost and the funder names is burned into the image.</p>
+      <p class="meta" id="camNote">Caption with date, cost and the funder names is burned into the image.</p>
     </div>
   </div>
 </div>
@@ -74,99 +78,114 @@ video,canvas.shot{width:100%;border-radius:10px;background:#000;display:block}
 <script src="alloc.js"></script>
 <script>
 const $=s=>document.querySelector(s);
-const saved=loadInput();
-let PLAN=null,SES=null;
-
-function parseSaved(){
-  if(!saved) return null;
-  const dept={};
-  saved.roster.split("\n").map(l=>l.trim()).filter(Boolean).forEach(l=>{
-    const p=l.split(",").map(x=>x.trim()); if(p.length>1) dept[p[0]]=p.slice(1).join(", ");});
-  const ses=[];
-  saved.sessions.split("\n").map(l=>l.trim()).filter(Boolean).forEach((l,i)=>{
-    const p=l.split("|").map(x=>x.trim()); if(p.length<3) return;
-    ses.push({id:i+1,date:p[0],cost:Number(p[1].replace(/[^\d.]/g,"")),
-      who:p[2].split(",").map(x=>x.trim()).filter(x=>x in dept)});});
-  return {dept,ses};
-}
+let D=load(), PLAN=null, SES=null, RES=null;
 
 function boot(){
-  const P=parseSaved();
-  if(!P||!P.ses.length){
+  D=load();
+  if(!D.roster.length||!D.sessions.length){
+    $("#pick").outerHTML=`<div class="note bad">No plan on this device. Open the <a href="index.html">planner</a>, add roster and sessions, then come back.</div>`;
     document.querySelectorAll(".card").forEach((c,i)=>{if(i)c.classList.add("hidden")});
-    $("#pick").outerHTML=`<div class="note bad">No plan saved on this device. Open the <a href="index.html">planner</a>, enter roster and sessions, then come back.</div>`;
     return;
   }
-  const r=allocate(P,saved.cap,saved.maxAct,saved.minFund,saved.mode);
-  PLAN={...r,dept:P.dept,minFund:saved.minFund};
-  $("#pick").innerHTML=r.out.map(s=>
-    `<option value="${s.id}">${s.date} — ${fmt(s.cost)} — ${s.valid?s.payers.length+" funders":"not eligible"}</option>`).join("");
-  $("#pick").onchange=draw; draw();
+  PLAN=allocate(D);
+  const sel=$("#pick");
+  sel.innerHTML=PLAN.out.map(s=>`<option value="${s.id}">${s.locked?"🔒 ":""}${s.date} · ${fmtShort(s.cost)} · ${s.valid?s.payers.length+" funders":"not eligible"}</option>`).join("");
+  const open=PLAN.out.find(s=>!s.locked&&s.valid);
+  if(open) sel.value=open.id;
+  sel.onchange=draw; draw();
 }
 
 function draw(){
-  const id=Number($("#pick").value);
-  SES=PLAN.out.find(s=>s.id===id);
-  const need=SES.payers.map(p=>p.n);
-  const extra=SES.who.filter(w=>!need.includes(w));
+  RES=PLAN.out.find(s=>s.id===$("#pick").value);
+  SES=RES;
+  const need=RES.payers.map(p=>p.n);
+  const extra=RES.who.filter(w=>!need.includes(w));
   const depts=[...new Set(need.map(n=>PLAN.dept[n]))];
 
-  $("#summary").innerHTML = SES.valid
-    ? `<div style="margin-top:12px"><h2>Faces required in photo</h2>
-       <div class="big">${need.length}</div>
-       <div class="meta">from ${depts.length} department${depts.length>1?"s":""}: ${depts.join(", ")}</div></div>`
-    : `<div class="note bad" style="margin-top:12px">Not reimbursable: ${SES.flags.join("; ")}</div>`;
+  $("#summary").innerHTML = RES.locked
+    ? `<div class="note lock" style="margin-top:12px"><b>Report locked</b> ${(RES.lockedAt||"").slice(0,10)} — photo already taken, funders frozen. Shown for reference only.</div>`
+    : RES.valid
+    ? `<div style="margin-top:12px"><h2>Faces required in photo</h2><div class="big">${need.length}</div>
+       <div class="meta">from ${depts.length} department${depts.length>1?"s":""}: ${depts.join(", ")}</div>
+       <div class="meta k">${need.map(p=>p+" "+fmtShort(RES.payers.find(x=>x.n===p).pay)).join(" · ")}</div></div>`
+    : `<div class="note bad" style="margin-top:12px">Not reimbursable: ${RES.flags.join("; ")}</div>`;
 
-  $("#sheet").innerHTML = `<h2>Must appear &mdash; named on the report</h2>`+
-    need.map(n=>row(n,true)).join("")+
-    (extra.length?`<h2 style="margin-top:16px">Also present &mdash; optional in frame</h2>`+extra.map(n=>row(n,false)).join(""):"")+
-    `<div id="tally" class="note ok" style="margin-top:14px"></div>`;
-  $("#sheet").querySelectorAll(".who").forEach(el=>el.onclick=()=>{el.classList.toggle("on");tally()});
+  $("#sheet").innerHTML = !RES.payers.length ? `<h2>Nothing to shoot</h2><p class="meta">Fix eligibility in the planner first.</p>`
+    : `<h2>Must appear &mdash; named on the report</h2>`+need.map(n=>rowEl(n,true)).join("")+
+      (extra.length?`<h2 style="margin-top:16px">Also present &mdash; optional in frame</h2>`+extra.map(n=>rowEl(n,false)).join(""):"")+
+      `<div id="tally" class="note ok" style="margin-top:14px"></div>`;
+  $("#sheet").querySelectorAll(".who").forEach(el=>{
+    if(RES.locked){el.classList.add("on");el.style.cursor="default";return}
+    el.onclick=()=>{el.classList.toggle("on");tally()};
+  });
   tally();
+  const shootable=RES.valid&&!RES.locked;
+  $("#camWrap").classList.toggle("hidden",!shootable);
+  $("#lockedNote").classList.toggle("hidden",!RES.locked);
+  resetCam();
 }
-const row=(n,req)=>`<div class="who ${req?"":"opt"}" data-req="${req}" data-n="${n}">
-   <div class="box">&#10003;</div><div>${n}</div><div class="d">${PLAN.dept[n]}</div></div>`;
+const rowEl=(n,req)=>`<div class="who ${req?"":"opt"}" data-req="${req}" data-n="${n}">
+   <div class="box">&#10003;</div><div>${n}</div><div class="d">${PLAN.dept[n]||"?"}</div></div>`;
 
 function tally(){
+  const t=$("#tally"); if(!t) return;
   const req=[...$("#sheet").querySelectorAll('.who[data-req="true"]')];
   const inShot=req.filter(e=>e.classList.contains("on"));
-  const t=$("#tally");
-  if(!t) return;
-  const missDepts=new Set(inShot.map(e=>PLAN.dept[e.dataset.n]));
-  if(inShot.length===req.length && missDepts.size>=2){
-    t.className="note ok"; t.textContent=`All ${req.length} required faces ticked, ${missDepts.size} departments. Photo is valid proof.`;
-  }else{
+  const depts=new Set(inShot.map(e=>PLAN.dept[e.dataset.n]));
+  const ready=inShot.length===req.length&&depts.size>=2;
+  if(ready){t.className="note ok";t.textContent=`All ${req.length} required faces ticked, ${depts.size} departments. Photo is valid proof.`}
+  else{
     t.className="note bad";
-    const missing=req.filter(e=>!e.classList.contains("on")).map(e=>e.dataset.n);
-    t.textContent = missing.length
-      ? `Still missing ${missing.length}: ${missing.join(", ")}`
-      : `Ticked faces span only ${missDepts.size} department — report needs 2.`;
+    const miss=req.filter(e=>!e.classList.contains("on")).map(e=>e.dataset.n);
+    t.textContent=miss.length?`Still missing ${miss.length}: ${miss.join(", ")}`
+      :`Ticked faces span only ${depts.size} department — report needs 2.`;
   }
+  const btn=$("#start");
+  if(btn&&!RES.locked){btn.disabled=!ready;
+    $("#camNote").textContent=ready?"Camera ready. Capturing locks this report permanently."
+      :"Tick every required face before shooting.";}
 }
 
 // ---- camera ----
 let stream=null;
+function resetCam(){
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+  $("#v").classList.add("hidden"); $("#c").classList.add("hidden");
+  $("#start").classList.remove("hidden"); $("#snap").classList.add("hidden");
+  $("#again").classList.add("hidden"); $("#save").classList.add("hidden");
+}
 $("#start").onclick=async()=>{
   try{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
     $("#v").srcObject=stream; $("#v").classList.remove("hidden");
     $("#start").classList.add("hidden"); $("#snap").classList.remove("hidden");
-  }catch(e){ $("#camNote").innerHTML=`<span style="color:var(--bad)">Camera unavailable: ${e.name}. Needs HTTPS (GitHub Pages is fine) and permission. Shoot with the normal camera app instead — the call sheet above is still the checklist.</span>`; }
+  }catch(e){ $("#camNote").innerHTML=`<span style="color:var(--bad)">Camera unavailable: ${e.name}. Needs HTTPS and permission. Shoot with the normal camera app — the checklist above still applies, then hit <b>Lock report</b>.</span>`;
+    $("#lockManual").classList.remove("hidden"); }
 };
 $("#snap").onclick=()=>{
   const v=$("#v"),c=$("#c");
   c.width=v.videoWidth||1280; c.height=v.videoHeight||720;
   const g=c.getContext("2d"); g.drawImage(v,0,0,c.width,c.height);
   caption(g,c);
-  stream.getTracks().forEach(t=>t.stop());
+  stream.getTracks().forEach(t=>t.stop()); stream=null;
   v.classList.add("hidden"); c.classList.remove("hidden");
   $("#snap").classList.add("hidden");
   $("#again").classList.remove("hidden"); $("#save").classList.remove("hidden");
+  doLock();
+};
+function doLock(){
+  if(RES.locked) return;
+  if(!lockSession(D,RES.id,RES.payers)){alert("Could not save the lock — storage may be full.");return}
+  const id=RES.id; PLAN=allocate(D);
+  boot(); $("#pick").value=id; 
+}
+$("#lockManual").onclick=()=>{
+  if(!confirm("Lock this report?\n\nFunders freeze permanently and can never be re-solved. Only do this once the photo exists.")) return;
+  doLock();
 };
 function caption(g,c){
-  const names=SES.payers.map(p=>p.n).join(", ");
-  const l1=`${SES.date}  •  ${fmt(SES.cost)}  •  Team Up!`;
-  const l2=`Report names: ${names}`;
+  const l1=`${RES.date}  •  ${fmt(RES.cost)}  •  Team Up!`;
+  const l2=`Report names: ${RES.payers.map(p=>p.n).join(", ")}`;
   const pad=Math.round(c.width*0.02), fs=Math.max(14,Math.round(c.width*0.028));
   g.font=`600 ${fs}px ui-sans-serif,sans-serif`;
   const lines=[l1,...wrap(g,l2,c.width-pad*2)];
@@ -177,21 +196,16 @@ function caption(g,c){
 }
 function wrap(g,t,max){
   const out=[];let cur="";
-  for(const w of t.split(" ")){
-    const test=cur?cur+" "+w:w;
-    if(g.measureText(test).width>max && cur){out.push(cur);cur=w}else cur=test;
-  }
-  if(cur)out.push(cur); return out;
+  for(const w of t.split(" ")){const test=cur?cur+" "+w:w;
+    if(g.measureText(test).width>max&&cur){out.push(cur);cur=w}else cur=test}
+  if(cur)out.push(cur);return out;
 }
-$("#again").onclick=()=>{
-  $("#c").classList.add("hidden"); $("#again").classList.add("hidden"); $("#save").classList.add("hidden");
-  $("#start").classList.remove("hidden"); $("#start").click();
-};
+$("#again").onclick=()=>{resetCam();$("#start").disabled=false;$("#start").click()};
 $("#save").onclick=async()=>{
   const blob=await new Promise(r=>$("#c").toBlob(r,"image/jpeg",0.9));
-  const file=new File([blob],`teamup-${SES.date}.jpg`,{type:"image/jpeg"});
+  const file=new File([blob],`teamup-${RES.date}.jpg`,{type:"image/jpeg"});
   if(navigator.canShare&&navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file],title:`Team Up! ${SES.date}`}); return }catch(e){}
+    try{await navigator.share({files:[file],title:`Team Up! ${RES.date}`});return}catch(e){}
   }
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob); a.download=file.name; a.click();

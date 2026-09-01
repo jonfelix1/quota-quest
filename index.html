@@ -7,48 +7,52 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#2f6f4f">
 <style>
-:root{
-  --bg:#f7f7f5; --card:#fff; --ink:#1c1b19; --mute:#6b6862; --line:#e3e0da;
-  --accent:#2f6f4f; --accent-soft:#e6f0ea; --warn:#8a4b12; --warn-soft:#fdf0e2;
-  --bad:#8c2f2f; --bad-soft:#fbe9e9;
-  color-scheme:light dark;
-}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
-  --bg:#16171a; --card:#1e2024; --ink:#eceae6; --mute:#9d9a94; --line:#32353b;
-  --accent:#7fc79f; --accent-soft:#1f2f27; --warn:#e0a86a; --warn-soft:#2e2519;
-  --bad:#e88b8b; --bad-soft:#301e1e;
-}}
-:root[data-theme=dark]{
-  --bg:#16171a; --card:#1e2024; --ink:#eceae6; --mute:#9d9a94; --line:#32353b;
-  --accent:#7fc79f; --accent-soft:#1f2f27; --warn:#e0a86a; --warn-soft:#2e2519;
-  --bad:#e88b8b; --bad-soft:#301e1e;
-}
+:root{--bg:#f7f7f5;--card:#fff;--ink:#1c1b19;--mute:#6b6862;--line:#e3e0da;
+ --accent:#2f6f4f;--accent-soft:#e6f0ea;--warn:#8a4b12;--warn-soft:#fdf0e2;
+ --bad:#8c2f2f;--bad-soft:#fbe9e9;--lock:#4a4f8a;--lock-soft:#e9eaf5;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#16171a;--card:#1e2024;--ink:#eceae6;
+ --mute:#9d9a94;--line:#32353b;--accent:#7fc79f;--accent-soft:#1f2f27;--warn:#e0a86a;--warn-soft:#2e2519;
+ --bad:#e88b8b;--bad-soft:#301e1e;--lock:#a8adde;--lock-soft:#22243a}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);
-  font:15px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
-.wrap{max-width:1060px;margin:0 auto;padding:28px 20px 80px}
-h1{font-size:26px;margin:0 0 4px;letter-spacing:-.02em}
-h2{font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);margin:0 0 12px}
-.sub{color:var(--mute);margin:0 0 26px;max-width:64ch}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:18px}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1060px;margin:0 auto;padding:26px 20px 90px}
+h1{font-size:25px;margin:0;letter-spacing:-.02em}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);margin:0 0 12px}
+.sub{color:var(--mute);margin:6px 0 24px;max-width:66ch}
+.card{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:18px;margin-bottom:16px}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font-weight:600;color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+th{font-weight:600;color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
 .scroll{overflow-x:auto}
 input,select,textarea,button{font:inherit;color:inherit}
-input,select,textarea{background:transparent;border:1px solid var(--line);border-radius:6px;padding:5px 7px}
-textarea{width:100%;min-height:150px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
-button{background:var(--accent);color:var(--bg);border:0;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:600}
+input,select,textarea{background:transparent;border:1px solid var(--line);border-radius:7px;padding:7px 9px}
+textarea{width:100%;min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:13px}
+button{background:var(--accent);color:var(--bg);border:0;border-radius:7px;padding:8px 14px;cursor:pointer;font-weight:600}
 button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad);font-weight:500}
+button.mini{padding:4px 10px;font-size:13px}
+button:disabled{opacity:.4;cursor:default}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;background:var(--accent-soft);color:var(--accent);margin:1px 2px 1px 0}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;background:var(--accent-soft);color:var(--accent);margin:2px 3px 2px 0}
+.pill.off{background:transparent;color:var(--mute);border:1px solid var(--line)}
+.pill.btn{cursor:pointer;user-select:none;border:1px solid transparent}
+.pill.btn.off{border-color:var(--line)}
 .k{font-variant-numeric:tabular-nums}
-.note{font-size:13px;padding:8px 11px;border-radius:7px;margin:6px 0}
-.note.warn{background:var(--warn-soft);color:var(--warn)}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;letter-spacing:.03em}
+.tag.ok{background:var(--accent-soft);color:var(--accent)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.bad{background:var(--bad-soft);color:var(--bad)}
+.tag.lock{background:var(--lock-soft);color:var(--lock)}
+.note{font-size:13px;padding:9px 12px;border-radius:8px;margin:8px 0}
 .note.bad{background:var(--bad-soft);color:var(--bad)}
-.note.ok{background:var(--accent-soft);color:var(--accent)}
+.note.lock{background:var(--lock-soft);color:var(--lock)}
 .bar{height:7px;border-radius:99px;background:var(--line);overflow:hidden;min-width:70px}
 .bar>i{display:block;height:100%;background:var(--accent)}
+.fab{display:flex;align-items:center;gap:9px;font-size:15px}
+.fab b{display:grid;place-items:center;width:24px;height:24px;border-radius:99px;background:var(--bg);color:var(--accent);font-size:18px;line-height:1}
+form.add{border:1px dashed var(--line);border-radius:10px;padding:14px;margin-top:12px}
+label.f{display:block;font-size:12px;color:var(--mute);margin-bottom:3px}
+a{color:var(--accent)}
 details summary{cursor:pointer;color:var(--mute);font-size:13px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media(max-width:760px){.grid2{grid-template-columns:1fr}}
@@ -57,170 +61,251 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:.92em;background:var(--a
 </head>
 <body>
 <div class="wrap">
-<div class="row" style="justify-content:space-between;align-items:flex-start">
-<h1>Quota Quest</h1>
-<a href="callsheet.html" style="color:var(--accent);font-size:14px;font-weight:600;text-decoration:none;border:1px solid var(--line);padding:7px 12px;border-radius:6px">Photo call sheet &rarr;</a>
-</div>
-<p class="sub">Team Up! budget allocator. Each session is funded by a chosen subset of its attendees, so a squad that plays 3&times;/month still gets every session reimbursed — rotate whose quarterly allowance pays.</p>
+  <div class="row" style="justify-content:space-between">
+    <h1>Quota Quest</h1>
+    <a href="callsheet.html" style="font-size:14px;font-weight:600;text-decoration:none;border:1px solid var(--line);padding:8px 13px;border-radius:7px">Photo call sheet &rarr;</a>
+  </div>
+  <p class="sub">Team Up! budget allocator. Each report is funded by a chosen subset of attendees, so a squad playing 3&times;/month still gets every session reimbursed &mdash; rotate whose quarterly allowance pays. Once a report is photographed it locks and never re-solves.</p>
 
-<div class="card">
-  <h2>Rules encoded</h2>
-  <table id="rulesTbl"></table>
-</div>
-
-<div class="card">
-  <h2>Input</h2>
-  <div class="grid2">
-    <div>
-      <label style="font-size:13px;color:var(--mute)">Roster — <code>Name, Department</code> per line</label>
-      <textarea id="roster"></textarea>
-    </div>
-    <div>
-      <label style="font-size:13px;color:var(--mute)">Sessions — <code>YYYY-MM-DD | cost | Name, Name, ...</code></label>
-      <textarea id="sessions"></textarea>
+  <div class="card">
+    <h2>Roster</h2>
+    <div class="grid2">
+      <div>
+        <label class="f"><code>Name, Department</code> per line</label>
+        <textarea id="roster" spellcheck="false"></textarea>
+      </div>
+      <div>
+        <label class="f">Settings</label>
+        <div class="row">
+          <label class="f" style="margin:0">Quarter cap<br><input id="cap" class="k" style="width:120px"></label>
+          <label class="f" style="margin:0">Reports / person / quarter<br><input id="maxAct" class="k" style="width:60px"></label>
+          <label class="f" style="margin:0">Min funders / report<br><input id="minFund" class="k" style="width:60px"></label>
+        </div>
+        <label class="f" style="margin-top:10px">Mode</label>
+        <select id="mode" style="width:100%">
+          <option value="quarter">Quarterly accumulation &mdash; up to 3 reports/quarter, no monthly limit</option>
+          <option value="month">Strict &mdash; also max 1 report per calendar month</option>
+        </select>
+        <div class="row" style="margin-top:12px">
+          <button class="ghost mini" id="demo">Load example data</button>
+          <button class="danger mini" id="wipe">Erase everything</button>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="row" style="margin-top:12px">
-    <button id="run">Allocate</button>
-    <button class="ghost" id="demo">Load example</button>
-    <label style="font-size:13px;color:var(--mute)">Quarter cap
-      <input id="cap" class="k" style="width:110px" value="1200000"></label>
-    <label style="font-size:13px;color:var(--mute)">Reports / person / quarter
-      <input id="maxAct" class="k" style="width:52px" value="3"></label>
-    <label style="font-size:13px;color:var(--mute)">Min funders / report
-      <input id="minFund" class="k" style="width:52px" value="4"></label>
-    <label style="font-size:13px;color:var(--mute)">Mode
-      <select id="mode">
-        <option value="quarter">Quarterly accumulation</option>
-        <option value="month">Strict 1 report / month</option>
-      </select></label>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <h2 style="margin:0">Sessions</h2>
+      <button id="toggleAdd" class="fab"><b>+</b> Add session</button>
+    </div>
+    <form class="add" id="addForm" hidden>
+      <div class="row" style="align-items:flex-end">
+        <div><label class="f" for="fDate">Date</label><input type="date" id="fDate" required></div>
+        <div><label class="f" for="fCost">Total cost (IDR)</label><input id="fCost" class="k" inputmode="numeric" placeholder="800000" required style="width:130px"></div>
+        <div style="flex:1;min-width:200px">
+          <label class="f">Who played &mdash; tap to toggle</label>
+          <div id="fWho"></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button type="submit" id="fSave">Add session</button>
+        <button type="button" class="ghost" id="fCancel">Cancel</button>
+        <span class="k" id="fCount" style="color:var(--mute);font-size:13px"></span>
+      </div>
+      <div id="fErr"></div>
+    </form>
+    <div id="sesList"></div>
   </div>
+
+  <div id="out"></div>
+
+  <div class="card"><details><summary>How the allocator decides</summary>
+    <p style="font-size:14px;color:var(--mute)">Locked reports claim their quota first, exactly as photographed &mdash; they are never re-solved.
+    Remaining sessions are then planned oldest-first. Eligible funders = attendees with quarter budget and a report slot left
+    (plus, in strict mode, no report already filed that month). The report is seeded with the highest-headroom candidates,
+    forced to span two departments, then cost splits evenly capped by each person's remaining quota &mdash; surplus re-spreads,
+    extra funders join until covered. If quota cannot reach the minimum number of <em>paying</em> names, the session is
+    reported unfunded rather than filed short-staffed. Greedy: good plans, not provably optimal. Quarters never share budget.</p>
+  </details></div>
 </div>
 
-<div id="out"></div>
-</div>
 <script src="alloc.js"></script>
 <script>
 const $=s=>document.querySelector(s);
-const fmt=n=>"IDR "+Math.round(n).toLocaleString("en-US");
-const RULES=[
- ["Eligibility","Permanent, contract, probation — all eligible. Roster = eligible list."],
- ["Session validity","&ge; 4 employees present, from &ge; 2 departments."],
- ["Report roster","Every reimbursement report must name &ge; 4 funders from &ge; 2 departments. Session cost splits across them."],
- ["Monthly path","Strict mode: 1 report per employee per calendar month."],
- ["Quarterly path","Default mode: accumulate up to 3 months of allowance in one quarter, appear on 1&ndash;3 reports. No monthly limit."],
- ["Hard cap","Max total claim per employee per quarter = quarter cap."],
- ["No carry-over","Unused allowance dies at quarter end. Each quarter solved on its own."],
-];
-$("#rulesTbl").innerHTML="<tr><th>Rule</th><th>Interpretation</th></tr>"+
-  RULES.map(([a,b])=>`<tr><td style="white-space:nowrap">${a}</td><td>${b}</td></tr>`).join("");
+let D=load();
 
-const DEMO_R=`Andi, Engineering
-Budi, Engineering
-Citra, Product
-Dewi, Product
-Eka, Finance
-Fajar, Marketing
-Gita, Engineering
-Hadi, Finance`;
-const DEMO_S=`2026-07-05 | 800000 | Andi, Budi, Citra, Dewi, Eka, Fajar
-2026-07-19 | 800000 | Andi, Budi, Citra, Dewi, Gita, Hadi
-2026-08-02 | 800000 | Andi, Budi, Citra, Dewi, Eka, Fajar
-2026-08-16 | 800000 | Andi, Budi, Citra, Eka, Fajar, Gita
-2026-09-06 | 800000 | Andi, Budi, Dewi, Eka, Gita, Hadi
-2026-09-20 | 800000 | Andi, Citra, Dewi, Fajar, Gita, Hadi`;
+const DEMO={roster:[["Andi","Engineering"],["Budi","Engineering"],["Citra","Product"],["Dewi","Product"],
+  ["Eka","Finance"],["Fajar","Marketing"],["Gita","Engineering"],["Hadi","Finance"]],
+ sessions:[["2026-07-05",["Andi","Budi","Citra","Dewi","Eka","Fajar"]],
+   ["2026-07-19",["Andi","Budi","Citra","Dewi","Gita","Hadi"]],
+   ["2026-08-02",["Andi","Budi","Citra","Dewi","Eka","Fajar"]],
+   ["2026-08-16",["Andi","Budi","Citra","Eka","Fajar","Gita"]],
+   ["2026-09-06",["Andi","Budi","Dewi","Eka","Gita","Hadi"]],
+   ["2026-09-20",["Andi","Citra","Dewi","Fajar","Gita","Hadi"]]]};
 
-$("#demo").onclick=()=>{$("#roster").value=DEMO_R;$("#sessions").value=DEMO_S;run()};
+// ---- roster + settings <-> store ----
+function rosterText(){return D.roster.map(r=>`${r.name}, ${r.dept}`).join("\n")}
+function readRoster(){
+  const seen=new Set();
+  D.roster=$("#roster").value.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{
+    const p=l.split(",").map(x=>x.trim());
+    return {name:p[0],dept:p.slice(1).join(", ")||"—"};
+  }).filter(r=>r.name&&!seen.has(r.name)&&seen.add(r.name));
+}
+function readSettings(){
+  D.settings={cap:Number($("#cap").value)||DEFAULTS.cap,
+    maxAct:Math.max(1,Number($("#maxAct").value)||DEFAULTS.maxAct),
+    minFund:Math.max(1,Number($("#minFund").value)||DEFAULTS.minFund),
+    mode:$("#mode").value};
+}
+function paintInputs(){
+  $("#roster").value=rosterText();
+  $("#cap").value=D.settings.cap; $("#maxAct").value=D.settings.maxAct;
+  $("#minFund").value=D.settings.minFund; $("#mode").value=D.settings.mode;
+}
+function commit(){readRoster();readSettings();save(D);render()}
+["roster","cap","maxAct","minFund"].forEach(i=>$("#"+i).oninput=commit);
+$("#mode").onchange=commit;
 
-function parse(){
-  const dept={},errs=[];
-  $("#roster").value.split("\n").map(l=>l.trim()).filter(Boolean).forEach((l,i)=>{
-    const p=l.split(",").map(s=>s.trim());
-    if(p.length<2||!p[0]) return errs.push(`Roster line ${i+1}: need "Name, Department"`);
-    dept[p[0]]=p.slice(1).join(", ");
+// ---- add-session form ----
+let picked=new Set();
+$("#toggleAdd").onclick=()=>{
+  const f=$("#addForm");
+  f.hidden=!f.hidden;
+  if(!f.hidden){
+    readRoster();
+    if(!D.roster.length){f.hidden=true;alert("Add the roster first — one \"Name, Department\" per line.");return}
+    const last=D.sessions[D.sessions.length-1];
+    $("#fDate").value=new Date().toISOString().slice(0,10);
+    $("#fCost").value=last?last.cost:800000;
+    picked=new Set(last?last.who.filter(n=>D.roster.some(r=>r.name===n)):[]);
+    paintWho(); $("#fErr").innerHTML=""; $("#fDate").focus();
+  }
+};
+$("#fCancel").onclick=()=>{$("#addForm").hidden=true};
+function paintWho(){
+  $("#fWho").innerHTML=D.roster.map(r=>
+    `<span class="pill btn ${picked.has(r.name)?"":"off"}" data-n="${r.name}" title="${r.dept}">${r.name}</span>`).join("");
+  $("#fWho").querySelectorAll(".pill").forEach(el=>el.onclick=()=>{
+    const n=el.dataset.n; picked.has(n)?picked.delete(n):picked.add(n); paintWho();
   });
-  const ses=[];
-  $("#sessions").value.split("\n").map(l=>l.trim()).filter(Boolean).forEach((l,i)=>{
-    const p=l.split("|").map(s=>s.trim());
-    if(p.length<3) return errs.push(`Session line ${i+1}: need "date | cost | names"`);
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(p[0])) return errs.push(`Session line ${i+1}: bad date "${p[0]}"`);
-    const cost=Number(p[1].replace(/[^\d.]/g,""));
-    if(!cost) return errs.push(`Session line ${i+1}: bad cost "${p[1]}"`);
-    const who=p[2].split(",").map(s=>s.trim()).filter(Boolean);
-    who.filter(w=>!(w in dept)).forEach(w=>errs.push(`Session line ${i+1}: "${w}" not in roster`));
-    ses.push({id:i+1,date:p[0],cost,who:who.filter(w=>w in dept)});
-  });
-  return {dept,ses,errs};
+  const depts=new Set([...picked].map(n=>D.roster.find(r=>r.name===n).dept));
+  const need=D.settings.minFund;
+  $("#fCount").textContent=`${picked.size} selected, ${depts.size} department${depts.size===1?"":"s"}`+
+    (picked.size<need?` — need ${need}`:depts.size<2?" — need 2 departments":" — eligible");
+}
+$("#addForm").onsubmit=e=>{
+  e.preventDefault();
+  readRoster();readSettings();
+  const date=$("#fDate").value, cost=Number($("#fCost").value.replace(/[^\d.]/g,""));
+  const errs=[];
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) errs.push("Pick a date.");
+  if(!cost) errs.push("Enter the total session cost.");
+  if(picked.size<2) errs.push("Pick who played.");
+  if(errs.length){$("#fErr").innerHTML=errs.map(x=>`<div class="note bad">${x}</div>`).join("");return}
+  D.sessions.push({id:uid(),date,cost,who:[...picked],locked:false,payers:null,lockedAt:null});
+  save(D); $("#addForm").hidden=true; render();
+};
+
+function delSession(id){
+  const s=D.sessions.find(x=>x.id===id);
+  if(s.locked){alert("Locked report — the photo is already taken, so it cannot be changed or deleted.");return}
+  D.sessions=D.sessions.filter(x=>x.id!==id); save(D); render();
+}
+function editWho(id){
+  const s=D.sessions.find(x=>x.id===id);
+  if(s.locked) return;
+  const v=prompt("Who played? Comma-separated names.",s.who.join(", "));
+  if(v===null) return;
+  readRoster();
+  s.who=v.split(",").map(x=>x.trim()).filter(n=>D.roster.some(r=>r.name===n));
+  save(D); render();
 }
 
+// ---- render ----
 function render(){
-  const P=parse(),cap=Number($("#cap").value)||1200000,
-    maxAct=Math.max(1,Number($("#maxAct").value)||3),
-    minFund=Math.max(1,Number($("#minFund").value)||4),
-    mode=$("#mode").value;
+  const R=allocate(D), out=R.out, dept=R.dept;
+
+  // session list
+  $("#sesList").innerHTML = !out.length
+    ? `<p style="color:var(--mute);margin:12px 0 0">No sessions yet. Hit <b>+ Add session</b>, or load the example data.</p>`
+    : `<div class="scroll"><table>
+        <tr><th>Date</th><th>Cost</th><th>Played</th><th>Report funders</th><th>Status</th><th></th></tr>`+
+      out.map(s=>`<tr>
+        <td style="white-space:nowrap">${s.date}<div style="font-size:11px;color:var(--mute)">${s.Q}</div></td>
+        <td class="k">${fmt(s.cost)}</td>
+        <td>${s.who.map(w=>`<span class="pill off" title="${dept[w]||"?"}">${w}</span>`).join("")}
+          ${s.locked?"":`<button class="ghost mini" style="margin-left:4px" onclick="editWho('${s.id}')">edit</button>`}</td>
+        <td>${s.payers.length?`<div style="font-size:11px;color:var(--mute)">${s.payers.length} names</div>`+
+            s.payers.map(p=>`${p.n} <span class="k" style="color:var(--mute)">${fmtShort(p.pay)}</span>`).join("<br>"):"&mdash;"}</td>
+        <td>${statusTag(s)}</td>
+        <td>${s.locked?`<span style="color:var(--mute);font-size:12px">immutable</span>`
+              :`<button class="ghost mini" onclick="delSession('${s.id}')">delete</button>`}</td>
+      </tr>`).join("")+`</table></div>`;
+
   const o=$("#out");
-  if(P.errs.length){o.innerHTML=`<div class="card"><h2>Input errors</h2>`+
-    P.errs.map(e=>`<div class="note bad">${e}</div>`).join("")+`</div>`;return}
-  if(!P.ses.length){o.innerHTML=`<div class="card"><p style="color:var(--mute);margin:0">No sessions yet. Load the example to see it work.</p></div>`;return}
-  const {out,st}=allocate(P,cap,maxAct,minFund,mode);
-  saveInput({roster:$("#roster").value,sessions:$("#sessions").value,cap,maxAct,minFund,mode});
-
+  if(!out.length){o.innerHTML="";return}
   const totCost=out.reduce((a,s)=>a+s.cost,0), totCov=out.reduce((a,s)=>a+s.covered,0);
-  let h=`<div class="card"><h2>Result</h2>
-   <div class="row" style="gap:26px">
-     <div><div style="font-size:12px;color:var(--mute)">Total session cost</div><div class="k" style="font-size:19px">${fmt(totCost)}</div></div>
-     <div><div style="font-size:12px;color:var(--mute)">Reimbursed</div><div class="k" style="font-size:19px;color:var(--accent)">${fmt(totCov)}</div></div>
-     <div><div style="font-size:12px;color:var(--mute)">Out of pocket</div><div class="k" style="font-size:19px">${fmt(totCost-totCov)}</div></div>
-     <div><div style="font-size:12px;color:var(--mute)">Coverage</div><div class="k" style="font-size:19px">${totCost?Math.round(totCov/totCost*100):0}%</div></div>
-   </div></div>`;
+  let h=`<div class="card"><h2>Result</h2><div class="row" style="gap:28px">
+    ${stat("Total session cost",fmt(totCost))}
+    ${stat("Reimbursed",fmt(totCov),"var(--accent)")}
+    ${stat("Out of pocket",fmt(totCost-totCov))}
+    ${stat("Coverage",(totCost?Math.round(totCov/totCost*100):0)+"%")}
+    ${stat("Locked reports",out.filter(s=>s.locked).length+" / "+out.length)}
+  </div></div>`;
 
-  h+=`<div class="card"><h2>Funding plan</h2><div class="scroll"><table>
-    <tr><th>#</th><th>Date</th><th>Cost</th><th>Attendees</th><th>Funded by</th><th>Status</th></tr>`;
-  for(const s of out){
-    const status = !s.valid ? `<span class="note bad" style="display:inline-block;margin:0">Not eligible: ${s.flags.join("; ")}</span>`
-      : s.short>1 ? `<span class="note warn" style="display:inline-block;margin:0">Short ${fmt(s.short)}</span>`
-      : `<span class="note ok" style="display:inline-block;margin:0">Fully covered</span>`;
-    h+=`<tr><td class="k">${s.id}</td><td style="white-space:nowrap">${s.date}</td><td class="k">${fmt(s.cost)}</td>
-      <td>${s.who.map(w=>`<span class="pill" title="${P.dept[w]}">${w}</span>`).join("")}</td>
-      <td>${s.payers.length?`<div style="font-size:12px;color:var(--mute);margin-bottom:2px">${s.payers.length} funders</div>`+s.payers.map(p=>`${p.n} <span class="k" style="color:var(--mute)">${fmt(p.pay)}</span>`).join("<br>"):"&mdash;"}</td>
-      <td>${status}</td></tr>`;
-  }
-  h+=`</table></div></div>`;
-
-  const quarters=[...new Set(out.map(s=>s.Q))].sort();
-  for(const Q of quarters){
-    h+=`<div class="card"><h2>Quota usage &mdash; ${Q}</h2><div class="scroll"><table>
-      <tr><th>Employee</th><th>Dept</th><th>Claimed</th><th>Remaining</th><th>Reports named on</th><th></th></tr>`;
-    for(const n of Object.keys(P.dept)){
-      const s=st[n]?.[Q]||{spent:0,reports:[]};
-      const pct=Math.min(100,s.spent/cap*100);
-      h+=`<tr><td>${n}</td><td style="color:var(--mute)">${P.dept[n]}</td>
-        <td class="k">${fmt(s.spent)}</td><td class="k">${fmt(cap-s.spent)}</td>
-        <td class="k">${s.reports.length} / ${maxAct} <span style="color:var(--mute)">(${s.reports.slice().sort().join(", ")||"—"})</span></td>
+  for(const Q of [...new Set(out.map(s=>s.Q))].sort()){
+    const lockN=out.filter(s=>s.Q===Q&&s.locked).length;
+    h+=`<div class="card"><div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <h2 style="margin:0">Quota usage &mdash; ${Q}</h2>
+      <button class="danger mini" onclick="doReset('${Q}')">Reset ${Q}</button></div>
+      <div class="scroll"><table>
+      <tr><th>Employee</th><th>Dept</th><th>Claimed</th><th>Remaining</th><th>Reports</th><th></th></tr>`;
+    for(const r of D.roster){
+      const s=R.st[r.name]?.[Q]||{spent:0,reports:[]};
+      const pct=Math.min(100,s.spent/D.settings.cap*100);
+      h+=`<tr><td>${r.name}</td><td style="color:var(--mute)">${r.dept}</td>
+        <td class="k">${fmt(s.spent)}</td><td class="k">${fmt(D.settings.cap-s.spent)}</td>
+        <td class="k">${s.reports.length} / ${D.settings.maxAct}
+          <span style="color:var(--mute)">(${s.reports.slice().sort().join(", ")||"—"})</span></td>
         <td style="width:120px"><div class="bar"><i style="width:${pct}%"></i></div></td></tr>`;
     }
-    h+=`</table></div></div>`;
+    h+=`</table></div><p style="font-size:12px;color:var(--mute);margin:10px 0 0">
+      Unused allowance does not carry into the next quarter. Reset clears this quarter's sessions${lockN?` — including ${lockN} locked report${lockN>1?"s":""}`:""} and frees the quota.</p></div>`;
   }
-
-  h+=`<div class="card"><details><summary>How the allocator decides</summary>
-   <p style="font-size:14px;color:var(--mute)">Sessions processed oldest first. Eligible funders for a session =
-   attendees with quarter budget left and a report slot left (plus, in strict monthly mode, no report already filed that month).
-   The report is seeded with the <span class="k">min funders</span> highest-headroom candidates, forced to span two departments,
-   then the cost is split evenly and capped by each person's remaining quota — surplus re-spreads over the others, and more
-   funders join until the cost is met. If the quota cannot stretch to the minimum number of <em>paying</em> names, the session
-   is reported unfunded rather than filed short-staffed. Greedy: good plans, not provably optimal. Quarters never share budget.</p></details></div>`;
   o.innerHTML=h;
 }
-const run=render;
-$("#run").onclick=run;
-["cap","maxAct"].forEach(i=>$("#"+i).oninput=run);
-const saved=loadInput();
-if(saved){$("#roster").value=saved.roster;$("#sessions").value=saved.sessions;
-  $("#cap").value=saved.cap;$("#maxAct").value=saved.maxAct;$("#minFund").value=saved.minFund;
-  $("#mode").value=saved.mode;run();}
-else $("#demo").click();
-["roster","sessions"].forEach(i=>$("#"+i).oninput=run);
-$("#mode").onchange=run;
+const stat=(l,v,c)=>`<div><div style="font-size:12px;color:var(--mute)">${l}</div>
+  <div class="k" style="font-size:19px${c?";color:"+c:""}">${v}</div></div>`;
+function statusTag(s){
+  if(s.locked) return `<span class="tag lock">Locked</span><div style="font-size:11px;color:var(--mute);margin-top:3px">${(s.lockedAt||"").slice(0,10)}</div>`;
+  if(!s.valid) return `<span class="tag bad">Not eligible</span><div style="font-size:11px;color:var(--bad);margin-top:3px">${s.flags.join("; ")}</div>`;
+  if(s.short>1) return `<span class="tag warn">Short ${fmtShort(s.short)}</span>`;
+  return `<span class="tag ok">Planned</span>`;
+}
+
+function doReset(Q){
+  const n=D.sessions.filter(s=>q(s.date)===Q).length;
+  const l=D.sessions.filter(s=>q(s.date)===Q&&s.locked).length;
+  if(!confirm(`Reset ${Q}?\n\nDeletes ${n} session(s)`+(l?`, including ${l} locked report(s)`:"")+
+    `, and returns everyone's ${Q} quota to full.\n\nThis cannot be undone.`)) return;
+  resetQuarter(D,Q); render();
+}
+$("#wipe").onclick=()=>{
+  if(!confirm("Erase all roster, sessions and locked reports on this device?\n\nThis cannot be undone.")) return;
+  D=blank(); save(D); paintInputs(); render();
+};
+$("#demo").onclick=()=>{
+  if(D.sessions.length && !confirm("Replace current data with the example?")) return;
+  D=blank();
+  D.roster=DEMO.roster.map(([name,dept])=>({name,dept}));
+  D.sessions=DEMO.sessions.map(([date,who])=>({id:uid(),date,cost:800000,who,locked:false,payers:null,lockedAt:null}));
+  save(D); paintInputs(); render();
+};
+
+window.delSession=delSession; window.editWho=editWho; window.doReset=doReset;
+paintInputs(); render();
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 </body>

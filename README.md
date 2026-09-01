@@ -33,7 +33,7 @@ Quota Quest does that assignment and shows the remaining headroom per person.
 
 | Screen | Use |
 |---|---|
-| [`index.html`](index.html) — Planner | Desk work. Paste roster (`Name, Department`) and sessions (`YYYY-MM-DD \| cost \| Name, Name, ...`), hit **Allocate**. Plan saves to the browser. |
+| [`index.html`](index.html) — Planner | Desk work. Paste the roster (`Name, Department`), then add sessions with **+ Add session** — date picker, cost, tap names to pick who played. Re-plans on every edit. |
 | [`callsheet.html`](callsheet.html) — Photo call sheet | Courtside, on a phone. Pick the session, see exactly which faces must be in the frame, tick them off, shoot the proof photo with the caption burned in. |
 
 ## Installable on Android (PWA, not an APK)
@@ -49,6 +49,22 @@ camera access with zero build toolchain.
 Camera needs HTTPS — GitHub Pages provides it. If permission is denied the checklist
 still works; shoot with the normal camera app.
 
+## Immutable reports
+
+A session's funder list is stored **on the session record**, not recomputed each time.
+Capturing the proof photo **locks** the report: those names and amounts freeze forever,
+because you cannot go back and re-shoot last month's game. Locked reports claim their
+quota first; every later session is planned around what is left. Locked sessions cannot
+be edited or deleted — only a quarter reset clears them.
+
+If you shot the photo with the normal camera app, use **Lock report without in-app photo**.
+
+## Quarter reset
+
+Each quarter's card has a **Reset** button. Unused allowance never carries over, so a
+reset deletes that quarter's sessions — locked reports included — and returns everyone's
+quota to full. Confirmation required; not undoable.
+
 ## Proof photo
 
 Required faces = the funders named on that session's report (≥ 4, spanning ≥ 2
@@ -60,7 +76,7 @@ share sheet. Photos never leave the device — no server, no upload.
 
 - `index.html` — planner UI
 - `callsheet.html` — phone call sheet + camera
-- `alloc.js` — shared allocator core
+- `alloc.js` — data store (`localStorage` key `quotaquest.v2`) + allocator core
 - `manifest.webmanifest`, `sw.js`, `icon-*.png` — PWA shell
 - `.nojekyll` — serve files as-is
 
