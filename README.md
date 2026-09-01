@@ -85,6 +85,19 @@ If you shot the photo with the normal camera app, use **Mark done** in the plann
 **Mark done without in-app photo** on the call sheet). Both confirm first, naming the
 funders and amounts about to freeze.
 
+## Quarter checks
+
+Everything in the scheme is per quarter — the IDR 1,200,000 cap, the 3-report limit,
+and reset. So the add-session form shows the quarter the picked date falls into, right
+under the field. If it is not the quarter you are already working in (the quarter of
+your newest session, or today's if there are none) it turns amber, explains that
+quarters never share budget, and asks for confirmation on submit. Import does the same
+check and reports when a file spans more than one quarter.
+
+Results are reported **per quarter**: session cost, reimbursed, out of pocket, coverage,
+done reports, quota used, and the per-person quota table — one card each. Only when more
+than one quarter exists is a combined all-quarters total shown, below them.
+
 ## Quarter reset
 
 Each quarter's card has a **Reset** button. Unused allowance never carries over, so a
