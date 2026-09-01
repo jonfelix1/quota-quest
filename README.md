@@ -49,20 +49,44 @@ camera access with zero build toolchain.
 Camera needs HTTPS — GitHub Pages provides it. If permission is denied the checklist
 still works; shoot with the normal camera app.
 
+## Planned vs done
+
+| State | Meaning |
+|---|---|
+| **Planned** | Editable. Tap any roster name in the session row to add or drop a player; funders re-solve instantly. |
+| **Ineligible** | Planned but not reimbursable (< 4 players, one department, or quota exhausted). **Mark done** is disabled with the reason on hover. |
+| **Done** | The photo exists. Funders and amounts are frozen forever, the player list is read-only, and there is no delete — only a quarter reset clears it. |
+
+Sessions are never deleted individually. That is deliberate: a done report is a filed
+claim, and a planned one costs nothing to leave in place. Use **Reset quarter** to clear.
+
+## Export / import
+
+**Export JSON** downloads the whole state — roster, sessions, done reports with their
+frozen funders, settings — as `quota-quest-YYYY-MM-DD.json`. **Import JSON** replaces
+the device's state after a confirmation naming the counts. That is how you move a plan
+from laptop to phone, hand over to the next organiser, or keep a backup before a
+quarter reset.
+
+Import is validated: wrong file tag, malformed dates, non-positive costs, an empty
+roster, or a session marked done with no funders are all rejected with the reason.
+Unknown player names are dropped silently.
+
 ## Immutable reports
 
 A session's funder list is stored **on the session record**, not recomputed each time.
-Capturing the proof photo **locks** the report: those names and amounts freeze forever,
-because you cannot go back and re-shoot last month's game. Locked reports claim their
-quota first; every later session is planned around what is left. Locked sessions cannot
-be edited or deleted — only a quarter reset clears them.
+Capturing the proof photo marks the report **done**: those names and amounts freeze forever,
+because you cannot go back and re-shoot last month's game. Done reports claim their
+quota first; every later session is planned around what is left.
 
-If you shot the photo with the normal camera app, use **Lock report without in-app photo**.
+If you shot the photo with the normal camera app, use **Mark done** in the planner (or
+**Mark done without in-app photo** on the call sheet). Both confirm first, naming the
+funders and amounts about to freeze.
 
 ## Quarter reset
 
 Each quarter's card has a **Reset** button. Unused allowance never carries over, so a
-reset deletes that quarter's sessions — locked reports included — and returns everyone's
+reset deletes that quarter's sessions — done reports included — and returns everyone's
 quota to full. Confirmation required; not undoable.
 
 ## Proof photo

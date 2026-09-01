@@ -113,6 +113,61 @@ function waterfall(set, cost) {
   return pool;
 }
 
+// ---- export / import ----------------------------------------------------
+const FILE_TAG = "quotaquest";
+
+function exportBlob(data) {
+  const payload = { tag: FILE_TAG, version: 2, exportedAt: new Date().toISOString(), ...data };
+  return new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+}
+
+// Returns {data} or {error}. Strict enough to refuse a foreign file, lenient about
+// missing optional fields so a hand-edited export still loads.
+function parseImport(text) {
+  let j;
+  try { j = JSON.parse(text) } catch (e) { return { error: "Not valid JSON: " + e.message } }
+  if (!j || typeof j !== "object") return { error: "File is not a Quota Quest export." };
+  if (j.tag && j.tag !== FILE_TAG) return { error: `Wrong file — tagged "${j.tag}".` };
+  if (!Array.isArray(j.roster) || !Array.isArray(j.sessions))
+    return { error: "Missing roster or sessions array." };
+
+  const roster = [], seen = new Set();
+  for (const r of j.roster) {
+    const name = String(r?.name ?? "").trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    roster.push({ name, dept: String(r?.dept ?? "—").trim() || "—" });
+  }
+  if (!roster.length) return { error: "Roster is empty." };
+
+  const sessions = [], ids = new Set();
+  for (const s of j.sessions) {
+    const date = String(s?.date ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: `Bad session date "${date}".` };
+    const cost = Number(s?.cost);
+    if (!(cost > 0)) return { error: `Bad session cost on ${date}.` };
+    const who = (Array.isArray(s?.who) ? s.who : []).map(String).filter(n => seen.has(n));
+    let id = String(s?.id ?? "") || uid();
+    while (ids.has(id)) id = uid();
+    ids.add(id);
+    const locked = !!s?.locked;
+    let payers = Array.isArray(s?.payers)
+      ? s.payers.map(p => ({ n: String(p?.n ?? ""), pay: Number(p?.pay) || 0 }))
+        .filter(p => seen.has(p.n) && p.pay > 0) : null;
+    if (locked && !(payers && payers.length))
+      return { error: `Session ${date} is marked done but has no funders.` };
+    sessions.push({ id, date, cost, who, locked, payers: locked ? payers : null,
+      lockedAt: locked ? (s.lockedAt || null) : null });
+  }
+  const settings = { ...DEFAULTS };
+  for (const k of Object.keys(DEFAULTS)) {
+    const v = j.settings?.[k];
+    if (k === "mode") { if (v === "month" || v === "quarter") settings.mode = v }
+    else if (Number(v) > 0) settings[k] = Number(v);
+  }
+  return { data: { roster, sessions, settings } };
+}
+
 // Freeze a session's report. Once locked the payers never change.
 function lockSession(data, id, payers) {
   const s = data.sessions.find(s => s.id === id);
