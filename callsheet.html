@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Photo Call Sheet &middot; Quota Quest</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2f6f4f">
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--ink:#1c1b19;--mute:#6b6862;--line:#e3e0da;
+ --accent:#2f6f4f;--accent-soft:#e6f0ea;--bad:#8c2f2f;--bad-soft:#fbe9e9;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#16171a;--card:#1e2024;--ink:#eceae6;
+ --mute:#9d9a94;--line:#32353b;--accent:#7fc79f;--accent-soft:#1f2f27;--bad:#e88b8b;--bad-soft:#301e1e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+ padding-bottom:env(safe-area-inset-bottom)}
+.wrap{max-width:560px;margin:0 auto;padding:18px 16px 60px}
+h1{font-size:20px;margin:0;letter-spacing:-.02em}
+a.back{color:var(--mute);font-size:14px;text-decoration:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
+select,button{font:inherit;color:inherit}
+select{width:100%;background:transparent;border:1px solid var(--line);border-radius:8px;padding:11px}
+button{background:var(--accent);color:var(--bg);border:0;border-radius:9px;padding:13px 16px;font-weight:600;cursor:pointer;width:100%}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+button:disabled{opacity:.45}
+.who{display:flex;align-items:center;gap:11px;padding:11px 2px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none}
+.who:last-child{border-bottom:0}
+.box{width:23px;height:23px;flex:0 0 23px;border:2px solid var(--line);border-radius:6px;display:grid;place-items:center;font-size:14px;color:transparent}
+.who.on .box{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.who .d{color:var(--mute);font-size:13px;margin-left:auto}
+.who.opt{opacity:.6}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);margin:0 0 6px}
+.big{font-size:30px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.note{font-size:14px;padding:10px 12px;border-radius:8px;margin:10px 0}
+.note.ok{background:var(--accent-soft);color:var(--accent)}
+.note.bad{background:var(--bad-soft);color:var(--bad)}
+video,canvas.shot{width:100%;border-radius:10px;background:#000;display:block}
+.hidden{display:none}
+.stack{display:grid;gap:9px}
+.meta{color:var(--mute);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h1>Photo Call Sheet</h1><a class="back" href="index.html">&larr; Planner</a>
+  </div>
+  <p class="meta" style="margin:6px 0 0">Who must be in the frame for this session's reimbursement report.</p>
+
+  <div class="card">
+    <h2>Session</h2>
+    <select id="pick"></select>
+    <div id="summary"></div>
+  </div>
+
+  <div class="card" id="sheet"></div>
+
+  <div class="card">
+    <h2>Proof photo</h2>
+    <div id="camWrap">
+      <video id="v" playsinline autoplay muted class="hidden"></video>
+      <canvas id="c" class="shot hidden"></canvas>
+      <div class="stack" style="margin-top:10px">
+        <button id="start">Open camera</button>
+        <button id="snap" class="hidden">Capture</button>
+        <button id="again" class="ghost hidden">Retake</button>
+        <button id="save" class="ghost hidden">Save / share photo</button>
+      </div>
+      <p class="meta" id="camNote">Caption with date, session cost and the funder names is burned into the image.</p>
+    </div>
+  </div>
+</div>
+
+<script src="alloc.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const saved=loadInput();
+let PLAN=null,SES=null;
+
+function parseSaved(){
+  if(!saved) return null;
+  const dept={};
+  saved.roster.split("\n").map(l=>l.trim()).filter(Boolean).forEach(l=>{
+    const p=l.split(",").map(x=>x.trim()); if(p.length>1) dept[p[0]]=p.slice(1).join(", ");});
+  const ses=[];
+  saved.sessions.split("\n").map(l=>l.trim()).filter(Boolean).forEach((l,i)=>{
+    const p=l.split("|").map(x=>x.trim()); if(p.length<3) return;
+    ses.push({id:i+1,date:p[0],cost:Number(p[1].replace(/[^\d.]/g,"")),
+      who:p[2].split(",").map(x=>x.trim()).filter(x=>x in dept)});});
+  return {dept,ses};
+}
+
+function boot(){
+  const P=parseSaved();
+  if(!P||!P.ses.length){
+    document.querySelectorAll(".card").forEach((c,i)=>{if(i)c.classList.add("hidden")});
+    $("#pick").outerHTML=`<div class="note bad">No plan saved on this device. Open the <a href="index.html">planner</a>, enter roster and sessions, then come back.</div>`;
+    return;
+  }
+  const r=allocate(P,saved.cap,saved.maxAct,saved.minFund,saved.mode);
+  PLAN={...r,dept:P.dept,minFund:saved.minFund};
+  $("#pick").innerHTML=r.out.map(s=>
+    `<option value="${s.id}">${s.date} — ${fmt(s.cost)} — ${s.valid?s.payers.length+" funders":"not eligible"}</option>`).join("");
+  $("#pick").onchange=draw; draw();
+}
+
+function draw(){
+  const id=Number($("#pick").value);
+  SES=PLAN.out.find(s=>s.id===id);
+  const need=SES.payers.map(p=>p.n);
+  const extra=SES.who.filter(w=>!need.includes(w));
+  const depts=[...new Set(need.map(n=>PLAN.dept[n]))];
+
+  $("#summary").innerHTML = SES.valid
+    ? `<div style="margin-top:12px"><h2>Faces required in photo</h2>
+       <div class="big">${need.length}</div>
+       <div class="meta">from ${depts.length} department${depts.length>1?"s":""}: ${depts.join(", ")}</div></div>`
+    : `<div class="note bad" style="margin-top:12px">Not reimbursable: ${SES.flags.join("; ")}</div>`;
+
+  $("#sheet").innerHTML = `<h2>Must appear &mdash; named on the report</h2>`+
+    need.map(n=>row(n,true)).join("")+
+    (extra.length?`<h2 style="margin-top:16px">Also present &mdash; optional in frame</h2>`+extra.map(n=>row(n,false)).join(""):"")+
+    `<div id="tally" class="note ok" style="margin-top:14px"></div>`;
+  $("#sheet").querySelectorAll(".who").forEach(el=>el.onclick=()=>{el.classList.toggle("on");tally()});
+  tally();
+}
+const row=(n,req)=>`<div class="who ${req?"":"opt"}" data-req="${req}" data-n="${n}">
+   <div class="box">&#10003;</div><div>${n}</div><div class="d">${PLAN.dept[n]}</div></div>`;
+
+function tally(){
+  const req=[...$("#sheet").querySelectorAll('.who[data-req="true"]')];
+  const inShot=req.filter(e=>e.classList.contains("on"));
+  const t=$("#tally");
+  if(!t) return;
+  const missDepts=new Set(inShot.map(e=>PLAN.dept[e.dataset.n]));
+  if(inShot.length===req.length && missDepts.size>=2){
+    t.className="note ok"; t.textContent=`All ${req.length} required faces ticked, ${missDepts.size} departments. Photo is valid proof.`;
+  }else{
+    t.className="note bad";
+    const missing=req.filter(e=>!e.classList.contains("on")).map(e=>e.dataset.n);
+    t.textContent = missing.length
+      ? `Still missing ${missing.length}: ${missing.join(", ")}`
+      : `Ticked faces span only ${missDepts.size} department — report needs 2.`;
+  }
+}
+
+// ---- camera ----
+let stream=null;
+$("#start").onclick=async()=>{
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+    $("#v").srcObject=stream; $("#v").classList.remove("hidden");
+    $("#start").classList.add("hidden"); $("#snap").classList.remove("hidden");
+  }catch(e){ $("#camNote").innerHTML=`<span style="color:var(--bad)">Camera unavailable: ${e.name}. Needs HTTPS (GitHub Pages is fine) and permission. Shoot with the normal camera app instead — the call sheet above is still the checklist.</span>`; }
+};
+$("#snap").onclick=()=>{
+  const v=$("#v"),c=$("#c");
+  c.width=v.videoWidth||1280; c.height=v.videoHeight||720;
+  const g=c.getContext("2d"); g.drawImage(v,0,0,c.width,c.height);
+  caption(g,c);
+  stream.getTracks().forEach(t=>t.stop());
+  v.classList.add("hidden"); c.classList.remove("hidden");
+  $("#snap").classList.add("hidden");
+  $("#again").classList.remove("hidden"); $("#save").classList.remove("hidden");
+};
+function caption(g,c){
+  const names=SES.payers.map(p=>p.n).join(", ");
+  const l1=`${SES.date}  •  ${fmt(SES.cost)}  •  Team Up!`;
+  const l2=`Report names: ${names}`;
+  const pad=Math.round(c.width*0.02), fs=Math.max(14,Math.round(c.width*0.028));
+  g.font=`600 ${fs}px ui-sans-serif,sans-serif`;
+  const lines=[l1,...wrap(g,l2,c.width-pad*2)];
+  const h=pad*1.4+lines.length*fs*1.32;
+  g.fillStyle="rgba(0,0,0,.62)"; g.fillRect(0,c.height-h,c.width,h);
+  g.fillStyle="#fff";
+  lines.forEach((t,i)=>g.fillText(t,pad,c.height-h+pad*0.9+fs*(i+0.85)));
+}
+function wrap(g,t,max){
+  const out=[];let cur="";
+  for(const w of t.split(" ")){
+    const test=cur?cur+" "+w:w;
+    if(g.measureText(test).width>max && cur){out.push(cur);cur=w}else cur=test;
+  }
+  if(cur)out.push(cur); return out;
+}
+$("#again").onclick=()=>{
+  $("#c").classList.add("hidden"); $("#again").classList.add("hidden"); $("#save").classList.add("hidden");
+  $("#start").classList.remove("hidden"); $("#start").click();
+};
+$("#save").onclick=async()=>{
+  const blob=await new Promise(r=>$("#c").toBlob(r,"image/jpeg",0.9));
+  const file=new File([blob],`teamup-${SES.date}.jpg`,{type:"image/jpeg"});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file],title:`Team Up! ${SES.date}`}); return }catch(e){}
+  }
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=file.name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+};
+
+boot();
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
