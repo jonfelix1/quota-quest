@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Quota Quest">
+  <!-- quota ring, broken where allowance runs out -->
+  <path d="M16 3.2a12.8 12.8 0 1 1-9.05 21.85" fill="none" stroke="currentColor"
+        stroke-width="3" stroke-linecap="round" opacity=".9"/>
+  <!-- the four faces a report must name -->
+  <circle cx="11.2" cy="11.2" r="2.9" fill="currentColor"/>
+  <circle cx="20.8" cy="11.2" r="2.9" fill="currentColor"/>
+  <circle cx="11.2" cy="20.8" r="2.9" fill="currentColor"/>
+  <circle cx="20.8" cy="20.8" r="2.9" fill="currentColor"/>
+</svg>

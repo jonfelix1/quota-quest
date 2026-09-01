@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Photo Call Sheet &middot; Quota Quest</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="mask-icon" href="favicon.svg" color="#2f6f4f">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#2f6f4f">
 <style>
@@ -16,6 +19,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 ui-sans-serif,
  padding-bottom:env(safe-area-inset-bottom)}
 .wrap{max-width:560px;margin:0 auto;padding:18px 16px 60px}
 h1{font-size:20px;margin:0;letter-spacing:-.02em}
+.lockup{display:flex;align-items:center;gap:10px}
+.mark{width:29px;height:29px;flex:0 0 29px;color:var(--accent);fill:currentColor}
 a.back{color:var(--mute);font-size:14px;text-decoration:none}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
 select,button{font:inherit;color:inherit}
@@ -45,7 +50,11 @@ video,canvas.shot{width:100%;border-radius:10px;background:#000;display:block}
 <body>
 <div class="wrap">
   <div style="display:flex;justify-content:space-between;align-items:center">
-    <h1>Photo Call Sheet</h1><a class="back" href="index.html">&larr; Planner</a>
+    <div class="lockup"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M16 3.2a12.8 12.8 0 1 1-9.05 21.85" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+      <circle cx="11.2" cy="11.2" r="2.9"/><circle cx="20.8" cy="11.2" r="2.9"/>
+      <circle cx="11.2" cy="20.8" r="2.9"/><circle cx="20.8" cy="20.8" r="2.9"/>
+    </svg><h1>Photo Call Sheet</h1></div><a class="back" href="index.html">&larr; Planner</a>
   </div>
   <p class="meta" style="margin:6px 0 0">Who must be in the frame for this session's reimbursement report.</p>
 

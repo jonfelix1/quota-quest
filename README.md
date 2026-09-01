@@ -1,3 +1,5 @@
+<img src="logo.svg" width="56" alt="">
+
 # Quota Quest
 
 Static allocator for the **Team Up!** sports reimbursement quota.
@@ -101,8 +103,16 @@ share sheet. Photos never leave the device — no server, no upload.
 - `index.html` — planner UI
 - `callsheet.html` — phone call sheet + camera
 - `alloc.js` — data store (`localStorage` key `quotaquest.v2`) + allocator core
-- `manifest.webmanifest`, `sw.js`, `icon-*.png` — PWA shell
+- `logo.svg` — header mark (inlined in both pages, `currentColor` so it follows the theme)
+- `favicon.svg`, `apple-touch-icon.png`, `icon-*.png` — icons
+- `manifest.webmanifest`, `sw.js` — PWA shell
 - `.nojekyll` — serve files as-is
+
+## Logo
+
+Four filled dots — the four employees a report must name — inside a quota ring left
+open at the bottom, for allowance that never carries into the next quarter. Inline SVG
+using `currentColor`, so it picks up the accent colour in light and dark themes.
 
 ## Deploy (GitHub Pages)
 
