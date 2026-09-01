@@ -80,8 +80,15 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:.92em;background:var(--a
     <button class="ghost" id="demo">Load example</button>
     <label style="font-size:13px;color:var(--mute)">Quarter cap
       <input id="cap" class="k" style="width:110px" value="1200000"></label>
-    <label style="font-size:13px;color:var(--mute)">Max activities funded / person / quarter
+    <label style="font-size:13px;color:var(--mute)">Reports / person / quarter
       <input id="maxAct" class="k" style="width:52px" value="3"></label>
+    <label style="font-size:13px;color:var(--mute)">Min funders / report
+      <input id="minFund" class="k" style="width:52px" value="4"></label>
+    <label style="font-size:13px;color:var(--mute)">Mode
+      <select id="mode">
+        <option value="quarter">Quarterly accumulation</option>
+        <option value="month">Strict 1 report / month</option>
+      </select></label>
   </div>
 </div>
 
@@ -96,8 +103,9 @@ const mo=d=>d.slice(0,7);
 const RULES=[
  ["Eligibility","Permanent, contract, probation — all eligible. Roster = eligible list."],
  ["Session validity","&ge; 4 employees present, from &ge; 2 departments."],
- ["Monthly path","1 funded activity per employee per month (allowance = cap / 3)."],
- ["Quarterly path","Accumulate up to 3 months of allowance in one quarter, spend on 1–3 activities."],
+ ["Report roster","Every reimbursement report must name &ge; 4 funders from &ge; 2 departments. Session cost splits across them."],
+ ["Monthly path","Strict mode: 1 report per employee per calendar month."],
+ ["Quarterly path","Default mode: accumulate up to 3 months of allowance in one quarter, appear on 1&ndash;3 reports. No monthly limit."],
  ["Hard cap","Max total claim per employee per quarter = quarter cap."],
  ["No carry-over","Unused allowance dies at quarter end. Each quarter solved on its own."],
 ];
@@ -142,57 +150,84 @@ function parse(){
   return {dept,ses,errs};
 }
 
-// Greedy allocator, per quarter. Pay session from attendees with most headroom
-// (headroom = remaining money, gated by remaining activity slots).
-function allocate({dept,ses},cap,maxAct){
-  const monthly=cap/maxAct;
-  const st={}; // name -> {byQ:{q:{spent,acts:Set}}}
-  const head=(n,Q)=>{const s=(st[n]?.[Q])||{spent:0,acts:new Set()};
-    return {rem:cap-s.spent, slots:maxAct-s.acts.size, s};};
+// Allocator, per quarter. Each report names >= minFund funders from >= 2 depts;
+// session cost splits across them, waterfall-capped by each funder's headroom.
+function allocate({dept,ses},cap,maxAct,minFund,mode){
+  const st={}; // name -> quarter -> {spent, reports:[months]}
+  const cur=(n,Q)=>{st[n]=st[n]||{}; return st[n][Q]=st[n][Q]||{spent:0,reports:[]}};
   const out=[];
   for(const x of [...ses].sort((a,b)=>a.date<b.date?-1:1)){
-    const Q=q(x.date), M=mo(x.date);
-    const flags=[];
-    const depts=new Set(x.who.map(w=>dept[w]));
-    if(x.who.length<4) flags.push(`only ${x.who.length} employees (need 4)`);
-    if(depts.size<2) flags.push(`only ${depts.size} department (need 2)`);
-    if(flags.length){out.push({...x,Q,M,valid:false,flags,payers:[],covered:0});continue}
+    const Q=q(x.date), M=mo(x.date), flags=[];
+    if(x.who.length<minFund) flags.push(`only ${x.who.length} attendees (need ${minFund})`);
+    if(new Set(x.who.map(w=>dept[w])).size<2) flags.push("attendees from only 1 department (need 2)");
+    if(flags.length){out.push({...x,Q,M,valid:false,flags,payers:[],covered:0,short:x.cost});continue}
 
-    // candidates: attendee usable amount this session
-    const cands=x.who.map(n=>{
-      const h=head(n,Q);
-      const usableSlot=h.s.acts.has(M)?0:1; // one funded activity per month per person
-      const canPayMonthly=h.s.acts.has(M)?0:monthly;
-      return {n,...h,canMonthly:canPayMonthly,usableSlot};
-    }).filter(c=>c.slots>0 && c.rem>0 && c.usableSlot>0)
+    // eligible funders for this session
+    const cands=x.who.map(n=>{const s0=cur(n,Q);
+        return {n,rem:cap-s0.spent,slots:maxAct-s0.reports.length,usedMonth:s0.reports.includes(M)};})
+      .filter(c=>c.rem>0.5 && c.slots>0 && !(mode==="month" && c.usedMonth))
       .sort((a,b)=>b.rem-a.rem || a.n.localeCompare(b.n));
 
-    let left=x.cost, payers=[];
-    for(const c of cands){
-      if(left<=1e-6) break;
-      const pay=Math.min(left,c.rem);
-      if(pay<=0) continue;
-      payers.push({n:c.n,pay});
-      left-=pay;
+    if(cands.length<minFund){
+      out.push({...x,Q,M,valid:false,payers:[],covered:0,short:x.cost,
+        flags:[`only ${cands.length} funder(s) with quota left (report needs ${minFund})`]});
+      continue;
     }
-    for(const p of payers){
-      st[p.n]=st[p.n]||{};
-      const s=st[p.n][Q]=st[p.n][Q]||{spent:0,acts:new Set()};
-      s.spent+=p.pay; s.acts.add(M);
+    // seed set = top minFund, forced to span >= 2 departments
+    let set=cands.slice(0,minFund);
+    if(new Set(set.map(c=>dept[c.n])).size<2){
+      const alt=cands.slice(minFund).find(c=>dept[c.n]!==dept[set[0].n]);
+      if(!alt){out.push({...x,Q,M,valid:false,payers:[],covered:0,short:x.cost,
+        flags:["eligible funders all from 1 department (need 2)"]});continue}
+      set=[...set.slice(0,minFund-1),alt];
     }
-    const covered=x.cost-left;
-    out.push({...x,Q,M,valid:true,flags:[],payers,covered,short:left});
+    // waterfall split; widen the set while cost is uncovered and candidates remain
+    let split=[],next=cands.filter(c=>!set.includes(c));
+    for(;;){
+      split=waterfall(set,x.cost);
+      const got=split.reduce((a,p)=>a+p.pay,0);
+      if(x.cost-got<=0.5 || !next.length) break;
+      set=[...set,next.shift()];
+    }
+    const payers=split.filter(p=>p.pay>0.5);
+    // a report must still name minFund people: keep zero-pay names out, re-check
+    if(payers.length<minFund){
+      out.push({...x,Q,M,valid:false,payers:[],covered:0,short:x.cost,
+        flags:[`quota only stretches to ${payers.length} paying funder(s) (report needs ${minFund})`]});
+      continue;
+    }
+    for(const p of payers){const s0=cur(p.n,Q); s0.spent+=p.pay; s0.reports.push(M);}
+    const covered=payers.reduce((a,p)=>a+p.pay,0);
+    out.push({...x,Q,M,valid:true,flags:[],payers,covered,short:x.cost-covered});
   }
   return {out,st};
 }
 
+// Even split capped by each funder's remaining quota; surplus re-spread over the rest.
+function waterfall(set,cost){
+  let pool=[...set].map(c=>({n:c.n,cap:c.rem,pay:0})),left=cost;
+  for(;;){
+    const open=pool.filter(p=>p.pay<p.cap-1e-6);
+    if(!open.length || left<=0.5) break;
+    const share=left/open.length;
+    let moved=0;
+    for(const p of open){const add=Math.min(share,p.cap-p.pay); p.pay+=add; moved+=add;}
+    left-=moved;
+    if(moved<=1e-6) break;
+  }
+  return pool;
+}
+
 function render(){
-  const P=parse(),cap=Number($("#cap").value)||1200000,maxAct=Math.max(1,Number($("#maxAct").value)||3);
+  const P=parse(),cap=Number($("#cap").value)||1200000,
+    maxAct=Math.max(1,Number($("#maxAct").value)||3),
+    minFund=Math.max(1,Number($("#minFund").value)||4),
+    mode=$("#mode").value;
   const o=$("#out");
   if(P.errs.length){o.innerHTML=`<div class="card"><h2>Input errors</h2>`+
     P.errs.map(e=>`<div class="note bad">${e}</div>`).join("")+`</div>`;return}
   if(!P.ses.length){o.innerHTML=`<div class="card"><p style="color:var(--mute);margin:0">No sessions yet. Load the example to see it work.</p></div>`;return}
-  const {out,st}=allocate(P,cap,maxAct);
+  const {out,st}=allocate(P,cap,maxAct,minFund,mode);
 
   const totCost=out.reduce((a,s)=>a+s.cost,0), totCov=out.reduce((a,s)=>a+s.covered,0);
   let h=`<div class="card"><h2>Result</h2>
@@ -211,7 +246,7 @@ function render(){
       : `<span class="note ok" style="display:inline-block;margin:0">Fully covered</span>`;
     h+=`<tr><td class="k">${s.id}</td><td style="white-space:nowrap">${s.date}</td><td class="k">${fmt(s.cost)}</td>
       <td>${s.who.map(w=>`<span class="pill" title="${P.dept[w]}">${w}</span>`).join("")}</td>
-      <td>${s.payers.length?s.payers.map(p=>`${p.n} <span class="k" style="color:var(--mute)">${fmt(p.pay)}</span>`).join("<br>"):"&mdash;"}</td>
+      <td>${s.payers.length?`<div style="font-size:12px;color:var(--mute);margin-bottom:2px">${s.payers.length} funders</div>`+s.payers.map(p=>`${p.n} <span class="k" style="color:var(--mute)">${fmt(p.pay)}</span>`).join("<br>"):"&mdash;"}</td>
       <td>${status}</td></tr>`;
   }
   h+=`</table></div></div>`;
@@ -219,23 +254,25 @@ function render(){
   const quarters=[...new Set(out.map(s=>s.Q))].sort();
   for(const Q of quarters){
     h+=`<div class="card"><h2>Quota usage &mdash; ${Q}</h2><div class="scroll"><table>
-      <tr><th>Employee</th><th>Dept</th><th>Claimed</th><th>Remaining</th><th>Activities funded</th><th></th></tr>`;
+      <tr><th>Employee</th><th>Dept</th><th>Claimed</th><th>Remaining</th><th>Reports named on</th><th></th></tr>`;
     for(const n of Object.keys(P.dept)){
-      const s=st[n]?.[Q]||{spent:0,acts:new Set()};
+      const s=st[n]?.[Q]||{spent:0,reports:[]};
       const pct=Math.min(100,s.spent/cap*100);
       h+=`<tr><td>${n}</td><td style="color:var(--mute)">${P.dept[n]}</td>
         <td class="k">${fmt(s.spent)}</td><td class="k">${fmt(cap-s.spent)}</td>
-        <td class="k">${s.acts.size} / ${maxAct} <span style="color:var(--mute)">(${[...s.acts].sort().join(", ")||"—"})</span></td>
+        <td class="k">${s.reports.length} / ${maxAct} <span style="color:var(--mute)">(${s.reports.slice().sort().join(", ")||"—"})</span></td>
         <td style="width:120px"><div class="bar"><i style="width:${pct}%"></i></div></td></tr>`;
     }
     h+=`</table></div></div>`;
   }
 
   h+=`<div class="card"><details><summary>How the allocator decides</summary>
-   <p style="font-size:14px;color:var(--mute)">Sessions processed oldest first. For each eligible session, candidate funders =
-   attendees who (a) have quarter budget left, (b) have an activity slot left, and (c) have not already funded an activity
-   that calendar month. Candidates sorted by remaining budget, descending; each pays up to its remainder until the session
-   cost is met. Greedy — good plans, not provably optimal. Quarters never share budget.</p></details></div>`;
+   <p style="font-size:14px;color:var(--mute)">Sessions processed oldest first. Eligible funders for a session =
+   attendees with quarter budget left and a report slot left (plus, in strict monthly mode, no report already filed that month).
+   The report is seeded with the <span class="k">min funders</span> highest-headroom candidates, forced to span two departments,
+   then the cost is split evenly and capped by each person's remaining quota — surplus re-spreads over the others, and more
+   funders join until the cost is met. If the quota cannot stretch to the minimum number of <em>paying</em> names, the session
+   is reported unfunded rather than filed short-staffed. Greedy: good plans, not provably optimal. Quarters never share budget.</p></details></div>`;
   o.innerHTML=h;
 }
 const run=render;
