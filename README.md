@@ -149,6 +149,28 @@ If an installed copy behaves differently from the deployed site, the build stamp
 the page footer. **Force refresh app** clears the offline cache and re-registers the
 service worker without touching your data.
 
+## Android notes
+
+The whole app is written in ES2017 syntax on purpose: no optional chaining, no nullish
+coalescing, no object spread. Android in-app WebViews (links opened from WhatsApp,
+Slack, Gmail) can be years behind Chrome, and one unsupported operator is a parse error
+that kills the entire script, which shows up as dead buttons and blank fields rather
+than an error.
+
+Other hardening for touch:
+
+- Any uncaught error paints a red banner naming the error and the build, instead of
+  failing silently.
+- `render()` is wrapped, so a draw failure still leaves the roster and your data intact.
+- Clicks go through one delegated handler, not inline `onclick` attributes, so a name
+  containing a quote can never break a button.
+- Tapping a name chip flips it in place and defers the re-solve by 350ms. Rebuilding
+  the row on every tap replaced the node under the finger, so fast taps did nothing.
+- Fields are read on blur, not per keystroke, so typing does not rebuild the row you
+  are editing. Inputs are 16px and buttons at least 42px tall under `pointer:coarse`.
+- A corrupt or half-written `localStorage` value loads as empty rather than throwing.
+  Verified against 10 malformed shapes, all render with no crash banner.
+
 ## Local vs deployed
 
 The two are the same code, but not the same storage: `localStorage` is per origin, so a

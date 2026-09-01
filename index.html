@@ -65,11 +65,24 @@ a{color:var(--accent)}
 details summary{cursor:pointer;color:var(--mute);font-size:13px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+/* Touch: Android taps need real targets, and the grey flash on every tap made
+   working buttons look broken. */
+@media (pointer:coarse){
+  button{min-height:42px;padding:11px 16px}
+  button.mini{min-height:38px;padding:9px 14px;font-size:14px}
+  .pill.btn{padding:8px 13px;font-size:14px}
+  input,select{min-height:42px;font-size:16px}   /* 16px stops iOS/Android zoom-on-focus */
+  th,td{padding:10px 8px}
+}
+button,.pill.btn{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.pill.btn{user-select:none;-webkit-user-select:none}
 code{font-family:ui-monospace,Menlo,monospace;font-size:.92em;background:var(--accent-soft);padding:1px 4px;border-radius:4px}
 </style>
 </head>
 <body>
+<noscript><p style="padding:16px">Quota Quest needs JavaScript. Nothing is uploaded; it all runs in this browser.</p></noscript>
 <div class="wrap">
+  <div id="crash"></div>
   <div class="row" style="justify-content:space-between">
     <div class="lockup">
     <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
@@ -163,283 +176,505 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:.92em;background:var(--a
 
 <script src="alloc.js"></script>
 <script>
-const $=s=>document.querySelector(s);
-let D=load();
+// Any uncaught error becomes a visible banner. On Android a silent script death looked
+// like dead buttons and empty fields, with nothing to go on.
+(function () {
+  function show(msg) {
+    var el = document.getElementById("crash");
+    if (!el) return;
+    el.innerHTML = '<div class="note bad"><b>Something broke.</b> ' + String(msg) +
+      '<br>Build ' + (typeof BUILD === "string" ? BUILD : "?") +
+      '. Try <b>Force refresh app</b>, or export your data and reload.</div>';
+  }
+  window.onerror = function (m, src, line) { show(m + " (line " + line + ")"); };
+  window.addEventListener("unhandledrejection", function (e) { show(e.reason) });
+})();
 
-const DEMO={roster:[["Andi","Engineering"],["Budi","Engineering"],["Citra","Product"],["Dewi","Product"],
-  ["Eka","Finance"],["Fajar","Marketing"],["Gita","Engineering"],["Hadi","Finance"]],
- sessions:[["2026-07-05",["Andi","Budi","Citra","Dewi","Eka","Fajar"]],
-   ["2026-07-19",["Andi","Budi","Citra","Dewi","Gita","Hadi"]],
-   ["2026-08-02",["Andi","Budi","Citra","Dewi","Eka","Fajar"]],
-   ["2026-08-16",["Andi","Budi","Citra","Eka","Fajar","Gita"]],
-   ["2026-09-06",["Andi","Budi","Dewi","Eka","Gita","Hadi"]],
-   ["2026-09-20",["Andi","Citra","Dewi","Fajar","Gita","Hadi"]]]};
+function $(sel) { return document.querySelector(sel) }
+function esc(t) {
+  return String(t == null ? "" : t).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 
-// ---- roster (one editable row per person) ----
-function readRoster(){}   // rows write straight to D
-// Only names ON a done report are frozen. Someone who merely played in a done session
-// can still leave the roster: the filed claim does not name them.
-const frozenNames=()=>new Set(D.sessions.filter(s=>s.locked)
-  .flatMap(s=>(s.payers||[]).map(p=>p.n)));
+var D = load();
 
-function paintRoster(){
-  const frozen=frozenNames();
-  const el=$("#rosterList");
-  if(!D.roster.length){
-    el.innerHTML=`<p style="color:var(--mute);margin:6px 0 0">Nobody yet. Hit <b>+ Add person</b>.</p>`;
+var DEMO_ROSTER = [["Andi","Engineering"],["Budi","Engineering"],["Citra","Product"],
+  ["Dewi","Product"],["Eka","Finance"],["Fajar","Marketing"],["Gita","Engineering"],["Hadi","Finance"]];
+var DEMO_SESSIONS = [
+  ["2026-07-05",["Andi","Budi","Citra","Dewi","Eka","Fajar"]],
+  ["2026-07-19",["Andi","Budi","Citra","Dewi","Gita","Hadi"]],
+  ["2026-08-02",["Andi","Budi","Citra","Dewi","Eka","Fajar"]],
+  ["2026-08-16",["Andi","Budi","Citra","Eka","Fajar","Gita"]],
+  ["2026-09-06",["Andi","Budi","Dewi","Eka","Gita","Hadi"]],
+  ["2026-09-20",["Andi","Citra","Dewi","Fajar","Gita","Hadi"]]];
+
+// ---- settings -----------------------------------------------------------
+// Read on blur, not per keystroke: re-rendering mid-typing on Android closed the
+// keyboard and blanked the field being edited.
+function paintSettings() {
+  $("#cap").value = D.settings.cap;
+  $("#maxAct").value = D.settings.maxAct;
+  $("#minFund").value = D.settings.minFund;
+  $("#mode").value = D.settings.mode;
+}
+function readSettings() {
+  D.settings.cap = num($("#cap").value, D.settings.cap);
+  D.settings.maxAct = Math.round(num($("#maxAct").value, D.settings.maxAct));
+  D.settings.minFund = Math.round(num($("#minFund").value, D.settings.minFund));
+  D.settings.mode = $("#mode").value === "month" ? "month" : "quarter";
+  save(D);
+}
+["cap", "maxAct", "minFund"].forEach(function (id) {
+  $("#" + id).addEventListener("change", function () { readSettings(); paintSettings(); render() });
+});
+$("#mode").addEventListener("change", function () { readSettings(); render() });
+
+// ---- roster (one editable row per person) -------------------------------
+function paintRoster() {
+  var frozen = frozenFunders(D);
+  var el = $("#rosterList");
+  if (!D.roster.length) {
+    el.innerHTML = '<p style="color:var(--mute);margin:6px 0 0">Nobody yet. Hit <b>+ Add person</b>.</p>';
     return;
   }
-  el.innerHTML=`<div class="scroll"><table>
-    <tr><th>Name</th><th>Department</th><th></th></tr>`+
-    D.roster.map((r,i)=>{
-      const lock=frozen.has(r.name);
-      return `<tr>
-        <td><input class="rn" data-i="${i}" value="${esc(r.name)}" ${lock?'readonly title="Funds a done report, so the name is frozen"':''} style="width:100%"></td>
-        <td><input class="rd" data-i="${i}" value="${esc(r.dept)}" style="width:100%"></td>
-        <td style="width:78px">${lock
-          ? `<span style="color:var(--mute);font-size:12px">funds report</span>`
-          : `<button class="ghost mini" onclick="delPerson(${i})">Remove</button>`}</td></tr>`;
-    }).join("")+`</table></div>
-    <p style="font-size:12px;color:var(--mute);margin:10px 0 0">${D.roster.length} people.
-    Anyone funding a done report is frozen: the claim is filed, so they cannot be renamed or removed.
-    Removing anyone else leaves done sessions untouched.</p>`;
-  el.querySelectorAll(".rn").forEach(inp=>inp.onchange=()=>renamePerson(+inp.dataset.i,inp.value));
-  el.querySelectorAll(".rd").forEach(inp=>inp.onchange=()=>{
-    const p=D.roster[+inp.dataset.i]; p.dept=inp.value.trim()||"?"; save(D);
-    p.name?render():paintRoster();
-  });
+  var rows = D.roster.map(function (r, i) {
+    var lock = !!frozen[r.name];
+    return '<tr><td><input class="rn" data-i="' + i + '" value="' + esc(r.name) + '" ' +
+      (lock ? 'readonly title="Funds a done report, so the name is frozen"' : 'placeholder="Name"') +
+      ' style="width:100%"></td>' +
+      '<td><input class="rd" data-i="' + i + '" value="' + esc(r.dept) + '" placeholder="Department" style="width:100%"></td>' +
+      '<td style="width:82px">' + (lock
+        ? '<span style="color:var(--mute);font-size:12px">funds report</span>'
+        : '<button class="ghost mini" data-act="delPerson" data-i="' + i + '">Remove</button>') +
+      '</td></tr>';
+  }).join("");
+  el.innerHTML = '<div class="scroll"><table><tr><th>Name</th><th>Department</th><th></th></tr>' +
+    rows + '</table></div>' +
+    '<p style="font-size:12px;color:var(--mute);margin:10px 0 0">' + namedRoster(D).length +
+    ' people. Anyone funding a done report is frozen: the claim is filed, so they cannot be' +
+    ' renamed or removed. Removing anyone else leaves done sessions untouched.</p>';
 }
-const esc=t=>String(t).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
-
-function addPerson(){
-  D.roster.push({name:"",dept:""});
+// Roster edits land on blur (change), so the row is never rebuilt under the cursor.
+$("#rosterList").addEventListener("change", function (e) {
+  var t = e.target, i = Number(t.getAttribute("data-i"));
+  if (!D.roster[i]) return;
+  if (t.className === "rn") renamePerson(i, t.value);
+  else if (t.className === "rd") { D.roster[i].dept = t.value.trim() || "?"; save(D); render() }
+});
+function addPerson() {
+  D.roster.push({ name: "", dept: "" });
   save(D); paintRoster();
-  const rows=$("#rosterList").querySelectorAll(".rn");
-  rows[rows.length-1]?.focus();
+  var rows = $("#rosterList").querySelectorAll(".rn");
+  if (rows.length) rows[rows.length - 1].focus();
 }
-function renamePerson(i,raw){
-  const r=D.roster[i], name=raw.trim(), old=r.name;
-  if(name===old){paintRoster();return}
-  if(!name){alert("A name cannot be blank.");paintRoster();return}
-  if(D.roster.some((x,j)=>j!==i&&x.name===name)){alert(name+" is already on the roster.");paintRoster();return}
-  if(frozenNames().has(old)){alert(old+" funds a done report, so the name is frozen.");paintRoster();return}
-  r.name=name;
-  for(const s of D.sessions){
-    if(s.locked) continue;
-    s.who=s.who.map(n=>n===old?name:n);
-    if(s.payers) s.payers=s.payers.map(p=>p.n===old?{...p,n:name}:p);
-  }
-  save(D); render();
-}
-function delPerson(i){
-  const r=D.roster[i];
-  if(frozenNames().has(r.name)){alert(r.name+" is named on a done report and cannot be removed. Only a quarter reset clears it.");return}
-  const inSes=D.sessions.filter(s=>!s.locked&&s.who.includes(r.name)).length;
-  if(r.name&&inSes&&!confirm(`Remove ${r.name}?\n\nAlso drops them from ${inSes} planned session(s), which re-solves those reports.`)) return;
-  D.roster.splice(i,1);
-  for(const s of D.sessions) if(!s.locked) s.who=s.who.filter(n=>n!==r.name);
-  save(D); render();
-}
-function readSettings(){
-  D.settings={cap:Number($("#cap").value)||DEFAULTS.cap,
-    maxAct:Math.max(1,Number($("#maxAct").value)||DEFAULTS.maxAct),
-    minFund:Math.max(1,Number($("#minFund").value)||DEFAULTS.minFund),
-    mode:$("#mode").value};
-}
-function paintInputs(){
-  $("#cap").value=D.settings.cap; $("#maxAct").value=D.settings.maxAct;
-  $("#minFund").value=D.settings.minFund; $("#mode").value=D.settings.mode;
-}
-function commit(){readRoster();readSettings();save(D);render()}
-["cap","maxAct","minFund"].forEach(i=>$("#"+i).oninput=commit);
-$("#addPerson").onclick=addPerson;
-$("#mode").onchange=commit;
-
-// ---- add-session form ----
-let picked=new Set();
-function activeQuarter(){
-  const dates=D.sessions.map(s=>s.date).sort();
-  return dates.length ? q(dates[dates.length-1]) : q(new Date().toISOString().slice(0,10));
-}
-// Sessions must sit in one quarter: quota, the 3-report limit and reset all work
-// per quarter, so a stray date silently plans against a different budget.
-function checkQuarter(){
-  const d=$("#fDate").value, el=$("#fQ");
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){el.textContent="";el.style.color="";return null}
-  const Q=q(d), A=activeQuarter();
-  el.style.color = Q===A ? "" : "var(--warn)";
-  el.textContent = Q===A ? Q : `${Q}, outside ${A}`;
-  return {Q,A,same:Q===A};
-}
-$("#toggleAdd").onclick=()=>{
-  const f=$("#addForm");
-  f.hidden=!f.hidden;
-  if(!f.hidden){
-    readRoster();
-    if(D.roster.filter(r=>r.name).length<2){f.hidden=true;alert("Add the roster first: at least 2 people, in 2 departments.");return}
-    const last=D.sessions[D.sessions.length-1];
-    $("#fDate").value=new Date().toISOString().slice(0,10);
-    $("#fCost").value=last?last.cost:800000;
-    picked=new Set();   // never sticky: every new session starts with nobody picked
-    paintWho(); checkQuarter(); $("#fErr").innerHTML=""; $("#fDate").focus();
-  }
-};
-$("#fCancel").onclick=()=>{$("#addForm").hidden=true};
-$("#fDate").oninput=()=>{const c=checkQuarter();
-  $("#fErr").innerHTML = c && !c.same
-    ? `<div class="note warn">${c.Q} is a different quarter from ${c.A}. Quarters never share budget: allowance, the ${D.settings.maxAct}-report limit and reset all apply per quarter. Add it only if you really mean to plan ${c.Q}.</div>`
-    : "";};
-function paintWho(){
-  $("#fWho").innerHTML=D.roster.filter(r=>r.name).map(r=>
-    `<span class="pill btn ${picked.has(r.name)?"":"off"}" data-n="${r.name}" title="${r.dept}">${r.name}</span>`).join("");
-  $("#fWho").querySelectorAll(".pill").forEach(el=>el.onclick=()=>{
-    const n=el.dataset.n; picked.has(n)?picked.delete(n):picked.add(n); paintWho();
+function renamePerson(i, raw) {
+  var r = D.roster[i], name = String(raw).trim(), old = r.name;
+  if (name === old) return;
+  var frozen = frozenFunders(D);
+  if (frozen[old]) { alert(old + " funds a done report, so the name is frozen."); paintRoster(); return }
+  var clash = false;
+  D.roster.forEach(function (x, j) { if (j !== i && x.name && x.name === name) clash = true });
+  if (clash) { alert(name + " is already on the roster."); paintRoster(); return }
+  r.name = name;
+  if (old) D.sessions.forEach(function (s) {
+    if (s.locked) return;
+    s.who = s.who.map(function (n) { return n === old ? name : n });
   });
-  const depts=new Set([...picked].map(n=>D.roster.find(r=>r.name===n).dept));
-  const need=D.settings.minFund;
-  const why = picked.size<need ? `need ${need} players` : depts.size<2 ? "need 2 departments" : "";
-  $("#fCount").textContent=`${picked.size} selected, ${depts.size} department${depts.size===1?"":"s"}`+(why?`: ${why}`:": eligible");
-  const b=$("#fSave");
-  b.disabled=!!why;
-  b.title=why?`Ineligible: ${why}`:"";
-}
-$("#addForm").onsubmit=e=>{
-  e.preventDefault();
-  readRoster();readSettings();
-  const date=$("#fDate").value, cost=Number($("#fCost").value.replace(/[^\d.]/g,""));
-  const depts=new Set([...picked].map(n=>D.roster.find(r=>r.name===n)?.dept));
-  const errs=[];
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) errs.push("Pick a date.");
-  if(!cost) errs.push("Enter the total session cost.");
-  if(picked.size<D.settings.minFund) errs.push(`Pick at least ${D.settings.minFund} players.`);
-  else if(depts.size<2) errs.push("Players must span at least 2 departments.");
-  if(errs.length){$("#fErr").innerHTML=errs.map(x=>`<div class="note bad">${x}</div>`).join("");return}
-  const c=checkQuarter();
-  if(c&&!c.same&&!confirm(`${date} falls in ${c.Q}, not ${c.A}.\n\nQuarters never share budget: this session gets planned against a separate ${c.Q} allowance.\n\nAdd it anyway?`)) return;
-  D.sessions.push({id:uid(),date,cost,who:[...picked],locked:false,payers:null,lockedAt:null});
-  save(D); $("#addForm").hidden=true; render();
-};
-
-// ---- render ----
-function render(){
-  const R=allocate(D), out=R.out, dept=R.dept;
-  paintRoster();
-
-  // session list
-  $("#sesList").innerHTML = !out.length
-    ? `<p style="color:var(--mute);margin:12px 0 0">No sessions yet. Hit <b>+ Add session</b>, or load the example data.</p>`
-    : `<div class="scroll"><table>
-        <tr><th>Date</th><th>Cost</th><th>State</th><th>Played</th><th>Report funders</th><th>Check</th></tr>`+
-      out.map(s=>`<tr>
-        <td style="white-space:nowrap">${s.date}<div style="font-size:11px;color:var(--mute)">${s.Q}</div></td>
-        <td class="k">${fmt(s.cost)}</td>
-        <td>${stateTag(s)}</td>
-        <td>${s.locked
-             ? s.who.map(w=>`<span class="pill off">${w}</span>`).join("")
-             : D.roster.filter(r=>r.name).map(r=>`<span class="pill btn ${s.who.includes(r.name)?"":"off"}"
-                 title="${r.dept}" onclick="togglePlayer('${s.id}','${r.name}')">${r.name}</span>`).join("")}
-        </td>
-        <td>${s.payers.length?`<div style="font-size:11px;color:var(--mute)">${s.payers.length} names</div>`+
-            s.payers.map(p=>`${p.n} <span class="k" style="color:var(--mute)">${fmtShort(p.pay)}</span>`).join("<br>"):""}</td>
-        <td>${checkCell(s)}</td>
-      </tr>`).join("")+`</table></div>
-      <p style="font-size:12px;color:var(--mute);margin:12px 0 0">Planned sessions stay editable: tap a name to add or drop a player.
-      Marking one <b>done</b> freezes its funders for good, because the photo exists and it can never be re-shot. Done sessions clear only via quarter reset.</p>`;
-
-  const o=$("#out");
-  if(!out.length){o.innerHTML="";return}
-  let h="";
-  const quarters=[...new Set(out.map(s=>s.Q))].sort();
-  for(const Q of quarters){
-    const qs=out.filter(s=>s.Q===Q);
-    const cost=qs.reduce((a,s)=>a+s.cost,0), cov=qs.reduce((a,s)=>a+s.covered,0);
-    const done=qs.filter(s=>s.locked).length;
-    const people=D.roster.filter(r=>r.name);
-    const capTot=people.length*D.settings.cap;
-    const used=people.reduce((a,r)=>a+(R.st[r.name]?.[Q]?.spent||0),0);
-    h+=`<div class="card">
-      <div class="row" style="justify-content:space-between;margin-bottom:14px">
-        <h2 style="margin:0">${Q} ${qs.length} session${qs.length>1?"s":""}</h2>
-        <button class="danger mini" onclick="doReset('${Q}')">Reset ${Q}</button></div>
-      <div class="row" style="gap:28px">
-        ${stat("Session cost",fmt(cost))}
-        ${stat("Reimbursed",fmt(cov),"var(--accent)")}
-        ${stat("Out of pocket",fmt(cost-cov),cost-cov>0?"var(--bad)":"")}
-        ${stat("Coverage",(cost?Math.round(cov/cost*100):0)+"%")}
-        ${stat("Done reports",done+" / "+qs.length)}
-        ${stat("Quarter quota used",Math.round(used/capTot*100)+"%",null,fmt(capTot-used)+" left across "+people.length+" people")}
-      </div>
-      <div class="scroll" style="margin-top:16px"><table>
-      <tr><th>Employee</th><th>Dept</th><th>Claimed</th><th>Remaining</th><th>Reports</th><th></th></tr>`;
-    for(const r of D.roster.filter(x=>x.name)){
-      const st=R.st[r.name]?.[Q]||{spent:0,reports:[]};
-      const pct=Math.min(100,st.spent/D.settings.cap*100);
-      h+=`<tr><td>${r.name}</td><td style="color:var(--mute)">${r.dept}</td>
-        <td class="k">${fmt(st.spent)}</td><td class="k">${fmt(D.settings.cap-st.spent)}</td>
-        <td class="k">${st.reports.length} / ${D.settings.maxAct}
-          <span style="color:var(--mute)">(${st.reports.slice().sort().join(", ")||""})</span></td>
-        <td style="width:120px"><div class="bar"><i style="width:${pct}%"></i></div></td></tr>`;
-    }
-    h+=`</table></div><p style="font-size:12px;color:var(--mute);margin:10px 0 0">
-      Unused allowance does not carry into the next quarter. Reset clears ${Q}'s ${qs.length} session${qs.length>1?"s":""}${done?`, including ${done} done report${done>1?"s":""}`:""} and frees the quota.</p></div>`;
-  }
-  if(quarters.length>1){
-    const cost=out.reduce((a,s)=>a+s.cost,0), cov=out.reduce((a,s)=>a+s.covered,0);
-    h+=`<div class="card"><h2>All ${quarters.length} quarters</h2><div class="row" style="gap:28px">
-      ${stat("Session cost",fmt(cost))}${stat("Reimbursed",fmt(cov),"var(--accent)")}
-      ${stat("Out of pocket",fmt(cost-cov))}${stat("Coverage",(cost?Math.round(cov/cost*100):0)+"%")}</div>
-      <p style="font-size:12px;color:var(--mute);margin:10px 0 0">Quarters never share budget, so each is solved on its own.</p></div>`;
-  }
-  o.innerHTML=h;
-}
-const stat=(l,v,c,sub)=>`<div><div style="font-size:12px;color:var(--mute)">${l}</div>
-  <div class="k" style="font-size:19px${c?";color:"+c:""}">${v}</div>
-  ${sub?`<div style="font-size:11px;color:var(--mute)">${sub}</div>`:""}</div>`;
-function stateTag(s){
-  if(s.locked) return `<span class="tag lock">Done</span><div style="font-size:11px;color:var(--mute);margin-top:3px">${(s.lockedAt||"").slice(0,10)}</div>`;
-  if(!s.valid) return `<span class="tag bad">Ineligible</span><div style="font-size:11px;color:var(--bad);margin-top:3px;max-width:190px">${s.flags.join("; ")}</div>`;
-  if(s.short>1) return `<span class="tag warn">Planned &middot; short ${fmtShort(s.short)}</span>`;
-  return `<span class="tag ok">Planned</span>`;
-}
-function checkCell(s){
-  if(s.locked) return `<span style="color:var(--mute);font-size:12px">immutable</span>`;
-  // A short report is still a real claim: the covered part gets reimbursed. Only a
-  // session that cannot be claimed at all blocks the button.
-  const why = !s.valid ? s.flags.join("; ") : s.payers.length<D.settings.minFund
-    ? `report needs ${D.settings.minFund} funders, has ${s.payers.length}` : "";
-  return why
-    ? `<button class="ghost mini" disabled>Mark done</button>
-       <div style="font-size:11px;color:var(--bad);margin-top:4px;max-width:150px">${why}</div>`
-    : `<button class="ghost mini" onclick="markDone('${s.id}')">Mark done</button>`+
-      (s.short>1?`<div style="font-size:11px;color:var(--warn);margin-top:4px">claims ${fmtShort(s.covered)} of ${fmtShort(s.cost)}</div>`:"");
-}
-function togglePlayer(id,name){
-  const s=D.sessions.find(x=>x.id===id);
-  if(!s||s.locked) return;
-  s.who=s.who.includes(name)?s.who.filter(n=>n!==name):[...s.who,name];
   save(D); render();
 }
-function markDone(id){
-  const r=allocate(D).out.find(s=>s.id===id);
-  if(!r||r.locked||!r.valid||r.payers.length<D.settings.minFund) return;
-  if(!confirm(`Mark ${r.date} done?\n\nFunders freeze permanently:\n`+
-    r.payers.map(p=>`  ${p.n}: ${fmt(p.pay)}`).join("\n")+
-    `\n\nClaimed ${fmt(r.covered)} of ${fmt(r.cost)}`+
-    (r.short>1?` (${fmt(r.short)} out of pocket)`:"")+
-    `\n\nOnly do this once the proof photo exists. This cannot be undone, only a quarter reset clears it.`)) return;
-  lockSession(D,id,r.payers); render();
+function delPerson(i) {
+  var r = D.roster[i];
+  if (!r) return;
+  var frozen = frozenFunders(D);
+  if (frozen[r.name]) {
+    alert(r.name + " funds a done report and cannot be removed. Only a quarter reset clears it.");
+    return;
+  }
+  var inSes = D.sessions.filter(function (s) { return !s.locked && s.who.indexOf(r.name) !== -1 }).length;
+  if (r.name && inSes && !confirm("Remove " + r.name + "?\n\nAlso drops them from " + inSes +
+    " planned session(s), which re-solves those reports.")) return;
+  D.roster.splice(i, 1);
+  D.sessions.forEach(function (s) {
+    if (s.locked) return;
+    s.who = s.who.filter(function (n) { return n !== r.name });
+  });
+  save(D); render();
 }
-window.delPerson=delPerson; window.togglePlayer=togglePlayer; window.markDone=markDone; window.doReset=doReset;
-paintInputs(); render();
-document.getElementById("build").textContent=BUILD;
-if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("sw.js").then(reg=>{
-    reg.update();
-    reg.addEventListener("updatefound",()=>{
-      $("#upd").innerHTML=`<div class="note warn">A newer version is installing.
-        <a href="#" onclick="location.reload();return false">Reload</a> to use it.</div>`;
+
+// ---- add session --------------------------------------------------------
+var picked = {};
+function activeQuarter() {
+  var dates = D.sessions.map(function (s) { return s.date }).sort();
+  return dates.length ? q(dates[dates.length - 1]) : q(new Date().toISOString().slice(0, 10));
+}
+// Everything in the scheme is per quarter: the cap, the report limit, reset. A stray
+// date silently plans against a different budget, so it gets flagged.
+function checkQuarter() {
+  var d = $("#fDate").value, el = $("#fQ");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { el.textContent = ""; el.style.color = ""; return null }
+  var Q = q(d), A = activeQuarter(), same = Q === A;
+  el.style.color = same ? "" : "var(--warn)";
+  el.textContent = same ? Q : Q + ", outside " + A;
+  return { Q: Q, A: A, same: same };
+}
+function openForm() {
+  var f = $("#addForm");
+  if (namedRoster(D).length < 2) {
+    alert("Add the roster first: at least 2 people, in 2 departments.");
+    return;
+  }
+  f.hidden = false;
+  var last = D.sessions.length ? D.sessions[D.sessions.length - 1] : null;
+  $("#fDate").value = new Date().toISOString().slice(0, 10);
+  $("#fCost").value = last ? last.cost : 800000;
+  picked = {};                        // never sticky: every new session starts empty
+  paintWho(); checkQuarter();
+  $("#fErr").innerHTML = "";
+}
+function paintWho() {
+  var people = namedRoster(D);
+  $("#fWho").innerHTML = people.map(function (r) {
+    return '<span class="pill btn ' + (picked[r.name] ? "" : "off") + '" data-act="pick" data-n="' +
+      esc(r.name) + '" title="' + esc(r.dept) + '">' + esc(r.name) + '</span>';
+  }).join("");
+  paintWhoCount();
+}
+// Counter only. Rebuilding the chip row on every tap replaced the node under the
+// finger, so fast taps on Android landed on a detached element and did nothing.
+function paintWhoCount() {
+  var people = namedRoster(D);
+  var names = Object.keys(picked), depts = {}, nDepts = 0;
+  names.forEach(function (n) {
+    var p = null;
+    people.forEach(function (r) { if (r.name === n) p = r });
+    if (p && !depts[p.dept]) { depts[p.dept] = true; nDepts++ }
+  });
+  var need = names.length < D.settings.minFund ? "need " + D.settings.minFund + " players"
+    : nDepts < 2 ? "need 2 departments" : "";
+  $("#fCount").textContent = names.length + " selected, " + nDepts +
+    (nDepts === 1 ? " department" : " departments") + (need ? ", " + need : ", eligible");
+  var b = $("#fSave");
+  b.disabled = !!need;
+  b.title = need ? "Ineligible: " + need : "";
+}
+function submitSession(e) {
+  if (e) e.preventDefault();
+  var date = $("#fDate").value;
+  var cost = Number(String($("#fCost").value).replace(/[^\d.]/g, ""));
+  var names = Object.keys(picked), errs = [];
+  var depts = {}, nDepts = 0;
+  namedRoster(D).forEach(function (r) {
+    if (picked[r.name] && !depts[r.dept]) { depts[r.dept] = true; nDepts++ }
+  });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) errs.push("Pick a date.");
+  if (!(cost > 0)) errs.push("Enter the total session cost.");
+  if (names.length < D.settings.minFund) errs.push("Pick at least " + D.settings.minFund + " players.");
+  else if (nDepts < 2) errs.push("Players must span at least 2 departments.");
+  if (errs.length) {
+    $("#fErr").innerHTML = errs.map(function (x) { return '<div class="note bad">' + x + "</div>" }).join("");
+    return;
+  }
+  var c = checkQuarter();
+  if (c && !c.same && !confirm(date + " falls in " + c.Q + ", not " + c.A +
+    ".\n\nQuarters never share budget, so this session gets planned against a separate " +
+    c.Q + " allowance.\n\nAdd it anyway?")) return;
+  D.sessions.push({ id: uid(), date: date, cost: cost, who: names,
+    locked: false, payers: null, lockedAt: null });
+  save(D);
+  $("#addForm").hidden = true;
+  render();
+}
+
+// ---- session actions ----------------------------------------------------
+var reflowTimer = null;
+// The chip flips instantly; the full re-solve lands a beat later, so tapping four
+// players in a row does not rebuild the whole page four times.
+function togglePlayer(id, name) {
+  var s = null;
+  D.sessions.forEach(function (x) { if (x.id === id) s = x });
+  if (!s || s.locked) return;
+  s.who = s.who.indexOf(name) !== -1
+    ? s.who.filter(function (n) { return n !== name })
+    : s.who.concat([name]);
+  save(D);
+  clearTimeout(reflowTimer);
+  reflowTimer = setTimeout(render, 350);
+}
+function markDone(id) {
+  var r = null;
+  allocate(D).out.forEach(function (s) { if (s.id === id) r = s });
+  if (!r || r.locked || !r.valid || r.payers.length < D.settings.minFund) return;
+  var lines = r.payers.map(function (p) { return "  " + p.n + ": " + fmt(p.pay) }).join("\n");
+  if (!confirm("Mark " + r.date + " done?\n\nFunders freeze permanently:\n" + lines +
+    "\n\nClaimed " + fmt(r.covered) + " of " + fmt(r.cost) +
+    (r.short > 1 ? " (" + fmt(r.short) + " out of pocket)" : "") +
+    "\n\nOnly do this once the proof photo exists. This cannot be undone, only a quarter reset clears it.")) return;
+  lockSession(D, id, r.payers);
+  render();
+}
+function doReset(Q) {
+  var qs = D.sessions.filter(function (s) { return q(s.date) === Q });
+  var done = qs.filter(function (s) { return s.locked }).length;
+  if (!confirm("Reset " + Q + "?\n\nDeletes " + qs.length + " session(s)" +
+    (done ? ", including " + done + " done report(s)" : "") +
+    ", and returns everyone's " + Q + " quota to full.\n\nThis cannot be undone.")) return;
+  resetQuarter(D, Q);
+  render();
+}
+
+// ---- one delegated click handler ---------------------------------------
+// Inline onclick attributes meant every name had to survive HTML plus JS-string
+// quoting. Delegation removes that whole class of breakage.
+document.addEventListener("click", function (e) {
+  var t = e.target;
+  while (t && t !== document && !t.getAttribute) t = t.parentNode;
+  var el = t;
+  while (el && el !== document && !el.getAttribute("data-act")) el = el.parentNode;
+  if (!el || el === document) return;
+  var act = el.getAttribute("data-act");
+  if (act === "pick") {
+    var n = el.getAttribute("data-n");
+    if (picked[n]) { delete picked[n]; el.className = "pill btn off" }
+    else { picked[n] = true; el.className = "pill btn" }
+    paintWhoCount();
+  }
+  else if (act === "togglePlayer") {
+    var on = el.className.indexOf("off") === -1;
+    el.className = on ? "pill btn off" : "pill btn";
+    togglePlayer(el.getAttribute("data-id"), el.getAttribute("data-n"));
+  }
+  else if (act === "markDone") markDone(el.getAttribute("data-id"));
+  else if (act === "reset") doReset(el.getAttribute("data-q"));
+  else if (act === "delPerson") delPerson(Number(el.getAttribute("data-i")));
+  else if (act === "reload") location.reload();
+});
+$("#addPerson").addEventListener("click", addPerson);
+$("#toggleAdd").addEventListener("click", function () {
+  var f = $("#addForm");
+  if (f.hidden) openForm(); else f.hidden = true;
+});
+$("#fCancel").addEventListener("click", function () { $("#addForm").hidden = true });
+$("#addForm").addEventListener("submit", submitSession);
+$("#fDate").addEventListener("change", function () {
+  var c = checkQuarter();
+  $("#fErr").innerHTML = c && !c.same
+    ? '<div class="note warn">' + c.Q + " is a different quarter from " + c.A +
+      ". Quarters never share budget: allowance, the " + D.settings.maxAct +
+      "-report limit and reset all apply per quarter. Add it only if you really mean to plan " +
+      c.Q + ".</div>"
+    : "";
+});
+
+// ---- render -------------------------------------------------------------
+function stat(label, value, color, sub) {
+  return '<div><div style="font-size:12px;color:var(--mute)">' + label + '</div>' +
+    '<div class="k" style="font-size:19px' + (color ? ";color:" + color : "") + '">' + value + '</div>' +
+    (sub ? '<div style="font-size:11px;color:var(--mute)">' + sub + '</div>' : "") + '</div>';
+}
+function stateTag(s) {
+  if (s.locked) return '<span class="tag lock">Done</span><div style="font-size:11px;color:var(--mute);margin-top:3px">' +
+    String(s.lockedAt || "").slice(0, 10) + '</div>';
+  if (!s.valid) return '<span class="tag bad">Ineligible</span>';
+  if (s.short > 1) return '<span class="tag warn">Planned, short ' + fmtShort(s.short) + '</span>';
+  return '<span class="tag ok">Planned</span>';
+}
+function checkCell(s) {
+  if (s.locked) return '<span style="color:var(--mute);font-size:12px">immutable</span>';
+  // A short report is still a real claim: the covered part gets reimbursed. Only a
+  // session that cannot be claimed at all blocks the button, and the reason is printed
+  // rather than left in a title, which never shows on a touch screen.
+  var why = !s.valid ? s.flags.join("; ")
+    : s.payers.length < D.settings.minFund
+      ? "report needs " + D.settings.minFund + " funders, has " + s.payers.length : "";
+  if (why) return '<button class="ghost mini" disabled>Mark done</button>' +
+    '<div style="font-size:11px;color:var(--bad);margin-top:4px;max-width:160px">' + esc(why) + '</div>';
+  return '<button class="ghost mini" data-act="markDone" data-id="' + esc(s.id) + '">Mark done</button>' +
+    (s.short > 1 ? '<div style="font-size:11px;color:var(--warn);margin-top:4px">claims ' +
+      fmtShort(s.covered) + " of " + fmtShort(s.cost) + '</div>' : "");
+}
+
+function render() {
+  try { renderAll() } catch (err) {
+    var el = document.getElementById("crash");
+    if (el) el.innerHTML = '<div class="note bad"><b>Could not draw the page.</b> ' +
+      esc(err && err.message ? err.message : err) + '<br>Your data is still saved. ' +
+      'Build ' + BUILD + '. Export JSON, then use Force refresh app.</div>';
+    try { paintRoster() } catch (e2) {}
+  }
+}
+function renderAll() {
+  paintRoster();
+  var R = allocate(D), out = R.out, dept = R.dept, people = namedRoster(D);
+
+  if (!out.length) {
+    $("#sesList").innerHTML = '<p style="color:var(--mute);margin:12px 0 0">No sessions yet. Hit <b>+ Add session</b>, or load the example data.</p>';
+    $("#out").innerHTML = "";
+    return;
+  }
+
+  $("#sesList").innerHTML = '<div class="scroll"><table>' +
+    '<tr><th>Date</th><th>Cost</th><th>State</th><th>Played</th><th>Report funders</th><th>Check</th></tr>' +
+    out.map(function (s) {
+      var played = s.locked
+        ? s.who.map(function (w) { return '<span class="pill off">' + esc(w) + '</span>' }).join("")
+        : people.map(function (r) {
+            return '<span class="pill btn ' + (s.who.indexOf(r.name) !== -1 ? "" : "off") +
+              '" data-act="togglePlayer" data-id="' + esc(s.id) + '" data-n="' + esc(r.name) +
+              '" title="' + esc(r.dept) + '">' + esc(r.name) + '</span>';
+          }).join("");
+      var funders = s.payers.length
+        ? '<div style="font-size:11px;color:var(--mute)">' + s.payers.length + ' names</div>' +
+          s.payers.map(function (p) {
+            return esc(p.n) + ' <span class="k" style="color:var(--mute)">' + fmtShort(p.pay) + '</span>';
+          }).join("<br>")
+        : (s.flags.length ? '<span style="font-size:11px;color:var(--bad)">' + esc(s.flags.join("; ")) + '</span>' : "none");
+      return '<tr><td style="white-space:nowrap">' + s.date +
+        '<div style="font-size:11px;color:var(--mute)">' + s.Q + '</div></td>' +
+        '<td class="k">' + fmt(s.cost) + '</td><td>' + stateTag(s) + '</td>' +
+        '<td>' + played + '</td><td>' + funders + '</td><td>' + checkCell(s) + '</td></tr>';
+    }).join("") +
+    '</table></div><p style="font-size:12px;color:var(--mute);margin:12px 0 0">' +
+    'Planned sessions stay editable: tap a name to add or drop a player. Marking one <b>done</b> ' +
+    'freezes its funders for good, because the photo exists and it can never be re-shot. ' +
+    'Done sessions clear only via quarter reset.</p>';
+
+  var quarters = [];
+  out.forEach(function (s) { if (quarters.indexOf(s.Q) === -1) quarters.push(s.Q) });
+  quarters.sort();
+
+  var h = "";
+  quarters.forEach(function (Q) {
+    var qs = out.filter(function (s) { return s.Q === Q });
+    var cost = 0, cov = 0, done = 0;
+    qs.forEach(function (s) { cost += s.cost; cov += s.covered; if (s.locked) done++ });
+    var capTot = people.length * D.settings.cap, used = 0;
+    people.forEach(function (r) {
+      if (R.st[r.name] && R.st[r.name][Q]) used += R.st[r.name][Q].spent;
     });
-  }).catch(()=>{});
+    h += '<div class="card"><div class="row" style="justify-content:space-between;margin-bottom:14px">' +
+      '<h2 style="margin:0">' + Q + ", " + qs.length + (qs.length > 1 ? " sessions" : " session") + '</h2>' +
+      '<button class="danger mini" data-act="reset" data-q="' + Q + '">Reset ' + Q + '</button></div>' +
+      '<div class="row" style="gap:28px">' +
+        stat("Session cost", fmt(cost)) +
+        stat("Reimbursed", fmt(cov), "var(--accent)") +
+        stat("Out of pocket", fmt(cost - cov), cost - cov > 0 ? "var(--bad)" : null) +
+        stat("Coverage", (cost ? Math.round(cov / cost * 100) : 0) + "%") +
+        stat("Done reports", done + " / " + qs.length) +
+        stat("Quarter quota used", (capTot ? Math.round(used / capTot * 100) : 0) + "%", null,
+          fmt(capTot - used) + " left across " + people.length + " people") +
+      '</div><div class="scroll" style="margin-top:16px"><table>' +
+      '<tr><th>Employee</th><th>Dept</th><th>Claimed</th><th>Remaining</th><th>Reports</th><th></th></tr>' +
+      people.map(function (r) {
+        var st = (R.st[r.name] && R.st[r.name][Q]) || { spent: 0, reports: [] };
+        var pct = Math.min(100, st.spent / D.settings.cap * 100);
+        return '<tr><td>' + esc(r.name) + '</td><td style="color:var(--mute)">' + esc(r.dept) + '</td>' +
+          '<td class="k">' + fmt(st.spent) + '</td><td class="k">' + fmt(D.settings.cap - st.spent) + '</td>' +
+          '<td class="k">' + st.reports.length + " / " + D.settings.maxAct +
+          ' <span style="color:var(--mute)">(' + (st.reports.slice().sort().join(", ") || "none") + ')</span></td>' +
+          '<td style="width:120px"><div class="bar"><i style="width:' + pct + '%"></i></div></td></tr>';
+      }).join("") +
+      '</table></div><p style="font-size:12px;color:var(--mute);margin:10px 0 0">' +
+      'Unused allowance does not carry into the next quarter. Reset clears ' + Q + "'s " + qs.length +
+      (qs.length > 1 ? " sessions" : " session") +
+      (done ? ", including " + done + (done > 1 ? " done reports" : " done report") : "") +
+      ' and frees the quota.</p></div>';
+  });
+  if (quarters.length > 1) {
+    var tc = 0, tv = 0;
+    out.forEach(function (s) { tc += s.cost; tv += s.covered });
+    h += '<div class="card"><h2>All ' + quarters.length + ' quarters</h2><div class="row" style="gap:28px">' +
+      stat("Session cost", fmt(tc)) + stat("Reimbursed", fmt(tv), "var(--accent)") +
+      stat("Out of pocket", fmt(tc - tv)) + stat("Coverage", (tc ? Math.round(tv / tc * 100) : 0) + "%") +
+      '</div><p style="font-size:12px;color:var(--mute);margin:10px 0 0">' +
+      'Quarters never share budget, so each is solved on its own.</p></div>';
+  }
+  $("#out").innerHTML = h;
+}
+
+// ---- export / import / housekeeping ------------------------------------
+var ioTimer = null;
+function ioMsg(text, cls) {
+  $("#ioNote").innerHTML = '<div class="note ' + cls + '" style="margin:10px 0 0">' + text + '</div>';
+  clearTimeout(ioTimer);
+  ioTimer = setTimeout(function () { $("#ioNote").innerHTML = "" }, 8000);
+}
+$("#export").addEventListener("click", function () {
+  readSettings();
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(exportBlob(D));
+  a.download = "quota-quest-" + new Date().toISOString().slice(0, 10) + ".json";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(a.href) }, 4000);
+  var l = D.sessions.filter(function (s) { return s.locked }).length;
+  ioMsg("Exported " + namedRoster(D).length + " people, " + D.sessions.length +
+    " session(s), " + l + " done.", "ok");
+});
+$("#import").addEventListener("click", function () { $("#file").click() });
+$("#file").addEventListener("change", function (e) {
+  var f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  var fr = new FileReader();
+  fr.onerror = function () { ioMsg("Could not read that file.", "bad") };
+  fr.onload = function () {
+    var r = parseImport(String(fr.result));
+    if (r.error) { ioMsg("Import failed: " + esc(r.error), "bad"); return }
+    var qs = [];
+    r.data.sessions.forEach(function (s) { if (qs.indexOf(q(s.date)) === -1) qs.push(q(s.date)) });
+    qs.sort();
+    var l = r.data.sessions.filter(function (s) { return s.locked }).length;
+    if (!confirm("Replace everything on this device with " + f.name + "?\n\n" +
+      r.data.roster.length + " people, " + r.data.sessions.length + " session(s), " + l +
+      " done.\n\nCurrent data is lost unless you exported it.")) return;
+    D = r.data; save(D); paintSettings(); render();
+    ioMsg("Imported " + r.data.sessions.length + " session(s), " + l + " done, " +
+      (qs.length > 1 ? "spanning " + qs.length + " quarters: " + qs.join(", ") : "all in " + (qs[0] || "none")) +
+      ".", qs.length > 1 ? "warn" : "ok");
+  };
+  fr.readAsText(f);
+});
+$("#demo").addEventListener("click", function () {
+  if (D.sessions.length && !confirm("Replace current data with the example?")) return;
+  D = blank();
+  D.roster = DEMO_ROSTER.map(function (p) { return { name: p[0], dept: p[1] } });
+  D.sessions = DEMO_SESSIONS.map(function (p) {
+    return { id: uid(), date: p[0], cost: 800000, who: p[1], locked: false, payers: null, lockedAt: null };
+  });
+  save(D); paintSettings(); render();
+});
+$("#wipe").addEventListener("click", function () {
+  if (!confirm("Erase all roster, sessions and done reports on this device?\n\nThis cannot be undone.")) return;
+  D = blank(); save(D); paintSettings(); render();
+});
+// Escape hatch when an installed copy runs older code than the deployed site.
+// Touches caches and the service worker only, never the stored plan.
+$("#refresh").addEventListener("click", function () {
+  var jobs = [];
+  try {
+    if (window.caches && caches.keys)
+      jobs.push(caches.keys().then(function (ks) {
+        return Promise.all(ks.map(function (k) { return caches.delete(k) }));
+      }));
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations)
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+        return Promise.all(rs.map(function (r) { return r.unregister() }));
+      }));
+  } catch (e) {}
+  Promise.all(jobs).then(function () { location.reload() },
+                         function () { location.reload() });
+});
+
+paintSettings();
+render();
+$("#build").textContent = BUILD;
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").then(function (reg) {
+    reg.update();
+    reg.addEventListener("updatefound", function () {
+      $("#upd").innerHTML = '<div class="note warn">A newer version is installing. ' +
+        '<button class="ghost mini" data-act="reload">Reload</button> to use it.</div>';
+    });
+  }, function () {});
 }
 </script>
 </body>
