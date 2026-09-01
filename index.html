@@ -109,7 +109,7 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:.92em;background:var(--a
         <div><label class="f" for="fDate">Date</label><input type="date" id="fDate" required></div>
         <div><label class="f" for="fCost">Total cost (IDR)</label><input id="fCost" class="k" inputmode="numeric" placeholder="800000" required style="width:130px"></div>
         <div style="flex:1;min-width:200px">
-          <label class="f">Who played &mdash; tap to toggle</label>
+          <label class="f">Who plays &mdash; tap to toggle</label>
           <div id="fWho"></div>
         </div>
       </div>
@@ -184,7 +184,7 @@ $("#toggleAdd").onclick=()=>{
     const last=D.sessions[D.sessions.length-1];
     $("#fDate").value=new Date().toISOString().slice(0,10);
     $("#fCost").value=last?last.cost:800000;
-    picked=new Set(last?last.who.filter(n=>D.roster.some(r=>r.name===n)):[]);
+    picked=new Set();   // never sticky: every new session starts with nobody picked
     paintWho(); $("#fErr").innerHTML=""; $("#fDate").focus();
   }
 };
