@@ -114,6 +114,7 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:.92em;background:var(--a
           <button class="ghost mini" id="import">Import JSON</button>
           <input type="file" id="file" accept="application/json,.json" hidden>
           <button class="ghost mini" id="demo">Load example data</button>
+          <button class="ghost mini" id="refresh" title="Clears the offline cache and reloads. Your data is untouched.">Force refresh app</button>
           <button class="danger mini" id="wipe">Erase everything</button>
         </div>
       </div>
@@ -147,6 +148,7 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:.92em;background:var(--a
 
   <div id="out"></div>
 
+  <div id="upd"></div>
   <div class="card"><details><summary>How the allocator decides</summary>
     <p style="font-size:14px;color:var(--mute)">Done reports claim their quota first, exactly as photographed, and are never re-solved.
     Remaining sessions are then planned oldest-first. Eligible funders are attendees with quarter budget and a report slot left
@@ -155,6 +157,8 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:.92em;background:var(--a
     extra funders join until covered. If quota cannot reach the minimum number of <em>paying</em> names, the session is
     reported unfunded rather than filed short-staffed. Greedy: good plans, not provably optimal. Quarters never share budget.</p>
   </details></div>
+  <p style="font-size:11px;color:var(--mute);text-align:center">build <span id="build" class="k"></span>
+     &middot; all data stays in this browser, nothing is uploaded</p>
 </div>
 
 <script src="alloc.js"></script>
@@ -399,9 +403,15 @@ function stateTag(s){
 }
 function checkCell(s){
   if(s.locked) return `<span style="color:var(--mute);font-size:12px">immutable</span>`;
-  const ok=s.valid&&s.short<=1;
-  return `<button class="ghost mini" ${ok?"":"disabled title=\"Session is not reimbursable yet: fix the flags first\""}
-    onclick="markDone('${s.id}')">Mark done</button>`;
+  // A short report is still a real claim: the covered part gets reimbursed. Only a
+  // session that cannot be claimed at all blocks the button.
+  const why = !s.valid ? s.flags.join("; ") : s.payers.length<D.settings.minFund
+    ? `report needs ${D.settings.minFund} funders, has ${s.payers.length}` : "";
+  return why
+    ? `<button class="ghost mini" disabled>Mark done</button>
+       <div style="font-size:11px;color:var(--bad);margin-top:4px;max-width:150px">${why}</div>`
+    : `<button class="ghost mini" onclick="markDone('${s.id}')">Mark done</button>`+
+      (s.short>1?`<div style="font-size:11px;color:var(--warn);margin-top:4px">claims ${fmtShort(s.covered)} of ${fmtShort(s.cost)}</div>`:"");
 }
 function togglePlayer(id,name){
   const s=D.sessions.find(x=>x.id===id);
@@ -411,59 +421,26 @@ function togglePlayer(id,name){
 }
 function markDone(id){
   const r=allocate(D).out.find(s=>s.id===id);
-  if(!r||r.locked||!r.valid||r.short>1) return;
+  if(!r||r.locked||!r.valid||r.payers.length<D.settings.minFund) return;
   if(!confirm(`Mark ${r.date} done?\n\nFunders freeze permanently:\n`+
     r.payers.map(p=>`  ${p.n}: ${fmt(p.pay)}`).join("\n")+
-    `\n\nOnly do this once the proof photo exists. This cannot be undone: only a quarter reset clears it.`)) return;
+    `\n\nClaimed ${fmt(r.covered)} of ${fmt(r.cost)}`+
+    (r.short>1?` (${fmt(r.short)} out of pocket)`:"")+
+    `\n\nOnly do this once the proof photo exists. This cannot be undone, only a quarter reset clears it.`)) return;
   lockSession(D,id,r.payers); render();
 }
-function doReset(Q){
-  const n=D.sessions.filter(s=>q(s.date)===Q).length;
-  const l=D.sessions.filter(s=>q(s.date)===Q&&s.locked).length;
-  if(!confirm(`Reset ${Q}?\n\nDeletes ${n} session(s)`+(l?`, including ${l} locked report(s)`:"")+
-    `, and returns everyone's ${Q} quota to full.\n\nThis cannot be undone.`)) return;
-  resetQuarter(D,Q); render();
-}
-$("#wipe").onclick=()=>{
-  if(!confirm("Erase all roster, sessions and locked reports on this device?\n\nThis cannot be undone.")) return;
-  D=blank(); save(D); paintInputs(); render();
-};
-function ioMsg(t,cls){$("#ioNote").innerHTML=`<div class="note ${cls}" style="margin:10px 0 0">${t}</div>`;
-  clearTimeout(ioMsg.t); ioMsg.t=setTimeout(()=>{$("#ioNote").innerHTML=""},7000)}
-$("#export").onclick=()=>{
-  readRoster();readSettings();save(D);
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(exportBlob(D));
-  a.download=`quota-quest-${new Date().toISOString().slice(0,10)}.json`;
-  a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-  const l=D.sessions.filter(s=>s.locked).length;
-  ioMsg(`Exported ${D.roster.filter(r=>r.name).length} people, ${D.sessions.length} session(s), ${l} done.`,"ok");
-};
-$("#import").onclick=()=>$("#file").click();
-$("#file").onchange=async e=>{
-  const f=e.target.files[0]; e.target.value="";
-  if(!f) return;
-  const {data,error}=parseImport(await f.text());
-  if(error){ioMsg("Import failed: "+error,"bad");return}
-  const l=data.sessions.filter(s=>s.locked).length;
-  if(!confirm(`Replace everything on this device with ${f.name}?\n\n`+
-    `${data.roster.length} people, ${data.sessions.length} session(s), ${l} done.\n\nCurrent data is lost unless you exported it.`)) return;
-  D=data; save(D); paintInputs(); render();
-  const qs=[...new Set(data.sessions.map(s=>q(s.date)))].sort();
-  ioMsg(`Imported ${data.sessions.length} session(s), ${l} done, ${qs.length>1?`spanning ${qs.length} quarters: ${qs.join(", ")}`:`all in ${qs[0]||""}`}.`,
-    qs.length>1?"warn":"ok");
-};
-$("#demo").onclick=()=>{
-  if(D.sessions.length && !confirm("Replace current data with the example?")) return;
-  D=blank();
-  D.roster=DEMO.roster.map(([name,dept])=>({name,dept}));
-  D.sessions=DEMO.sessions.map(([date,who])=>({id:uid(),date,cost:800000,who,locked:false,payers:null,lockedAt:null}));
-  save(D); paintInputs(); render();
-};
-
 window.delPerson=delPerson; window.togglePlayer=togglePlayer; window.markDone=markDone; window.doReset=doReset;
 paintInputs(); render();
-if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+document.getElementById("build").textContent=BUILD;
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js").then(reg=>{
+    reg.update();
+    reg.addEventListener("updatefound",()=>{
+      $("#upd").innerHTML=`<div class="note warn">A newer version is installing.
+        <a href="#" onclick="location.reload();return false">Reload</a> to use it.</div>`;
+    });
+  }).catch(()=>{});
+}
 </script>
 </body>
 </html>

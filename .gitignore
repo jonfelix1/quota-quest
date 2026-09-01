@@ -1,0 +1,5 @@
+# Exported plans are personal data, never commit them
+*.json
+!manifest.webmanifest
+
+.DS_Store

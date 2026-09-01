@@ -1,4 +1,4 @@
-const V="quotaquest-v9";
+const V="quotaquest-v10";
 const ASSETS=["./","index.html","alloc.js","manifest.webmanifest",
   "icon-192.png","icon-512.png","icon-maskable-512.png","favicon.svg","logo.svg","apple-touch-icon.png"];
 self.addEventListener("install",e=>{

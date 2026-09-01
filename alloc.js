@@ -6,6 +6,7 @@
 // A locked session is IMMUTABLE: its payers were photographed, so they can never be
 // re-solved. Locked reports claim their quota first; unlocked ones plan around them.
 
+const BUILD = "2026-09-01.1";
 const STORE = "quotaquest.v2";
 const DEFAULTS = { cap: 1200000, maxAct: 3, minFund: 4, mode: "quarter" };
 

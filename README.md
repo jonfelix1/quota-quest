@@ -56,7 +56,8 @@ still works; shoot with the normal camera app.
 | State | Meaning |
 |---|---|
 | **Planned** | Editable. Tap any roster name in the session row to add or drop a player; funders re-solve instantly. |
-| **Ineligible** | Planned but not reimbursable (< 4 players, one department, or quota exhausted). **Mark done** is disabled with the reason on hover. |
+| **Ineligible** | Not claimable at all: under 4 players, one department, or nobody left with quota. **Mark done** is disabled and the reason is printed under it. |
+| **Short** | Claimable, but quota covers only part of the cost. **Mark done** stays enabled, showing `claims 600k of 800k`, since the covered part is still a real claim. |
 | **Done** | The photo exists. Funders and amounts are frozen forever, the player list is read-only, and there is no delete: only a quarter reset clears it. |
 
 Sessions are never deleted individually. That is deliberate: a done report is a filed
@@ -136,7 +137,25 @@ using `currentColor`, so it picks up the accent colour in light and dark themes.
 
 ## Deploy (GitHub Pages)
 
-Repo → Settings → Pages → Source: **Deploy from a branch**, branch `main`, folder `/ (root)`.
+`.github/workflows/pages.yml` uploads the repo as-is on every push to `main`. Set
+Settings > Pages > Source to **GitHub Actions**.
+
+Deliberately **not** the Jekyll workflow: Jekyll runs every `.html` through Liquid, so a
+stray `{%` or `{{` inside the app's JS or CSS can blank part of the page on Pages while
+`file://` works fine. `callsheet.html` already contains `width:100%}`, which Liquid reads
+as a tag close.
+
+If an installed copy behaves differently from the deployed site, the build stamp is in
+the page footer. **Force refresh app** clears the offline cache and re-registers the
+service worker without touching your data.
+
+## Local vs deployed
+
+The two are the same code, but not the same storage: `localStorage` is per origin, so a
+plan entered on `file://` is invisible to `username.github.io` and vice versa. Move a
+plan across with **Export JSON** then **Import JSON**.
+
+Exported `.json` files are gitignored. They hold real names and claim amounts.
 
 ## Caveat
 
