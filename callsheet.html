@@ -112,7 +112,7 @@ function draw(){
   const depts=[...new Set(need.map(n=>PLAN.dept[n]))];
 
   $("#summary").innerHTML = RES.locked
-    ? `<div class="note lock" style="margin-top:12px"><b>Report done</b> ${(RES.lockedAt||"").slice(0,10)} — photo already taken, funders frozen. Shown for reference only.</div>`
+    ? `<div class="note lock" style="margin-top:12px"><b>Report done</b> ${(RES.lockedAt||"").slice(0,10)}: photo already taken, funders frozen. Shown for reference only.</div>`
     : RES.valid
     ? `<div style="margin-top:12px"><h2>Faces required in photo</h2><div class="big">${need.length}</div>
        <div class="meta">from ${depts.length} department${depts.length>1?"s":""}: ${depts.join(", ")}</div>
@@ -120,8 +120,8 @@ function draw(){
     : `<div class="note bad" style="margin-top:12px">Not reimbursable: ${RES.flags.join("; ")}</div>`;
 
   $("#sheet").innerHTML = !RES.payers.length ? `<h2>Nothing to shoot</h2><p class="meta">Fix eligibility in the planner first.</p>`
-    : `<h2>Must appear &mdash; named on the report</h2>`+need.map(n=>rowEl(n,true)).join("")+
-      (extra.length?`<h2 style="margin-top:16px">Also present &mdash; optional in frame</h2>`+extra.map(n=>rowEl(n,false)).join(""):"")+
+    : `<h2>Must appear named on the report</h2>`+need.map(n=>rowEl(n,true)).join("")+
+      (extra.length?`<h2 style="margin-top:16px">Also present optional in frame</h2>`+extra.map(n=>rowEl(n,false)).join(""):"")+
       `<div id="tally" class="note ok" style="margin-top:14px"></div>`;
   $("#sheet").querySelectorAll(".who").forEach(el=>{
     if(RES.locked){el.classList.add("on");el.style.cursor="default";return}
@@ -147,7 +147,7 @@ function tally(){
     t.className="note bad";
     const miss=req.filter(e=>!e.classList.contains("on")).map(e=>e.dataset.n);
     t.textContent=miss.length?`Still missing ${miss.length}: ${miss.join(", ")}`
-      :`Ticked faces span only ${depts.size} department — report needs 2.`;
+      :`Ticked faces span only ${depts.size} department: report needs 2.`;
   }
   const btn=$("#start");
   if(btn&&!RES.locked){btn.disabled=!ready;
@@ -168,7 +168,7 @@ $("#start").onclick=async()=>{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
     $("#v").srcObject=stream; $("#v").classList.remove("hidden");
     $("#start").classList.add("hidden"); $("#snap").classList.remove("hidden");
-  }catch(e){ $("#camNote").innerHTML=`<span style="color:var(--bad)">Camera unavailable: ${e.name}. Needs HTTPS and permission. Shoot with the normal camera app — the checklist above still applies, then hit <b>Mark done</b>.</span>`;
+  }catch(e){ $("#camNote").innerHTML=`<span style="color:var(--bad)">Camera unavailable: ${e.name}. Needs HTTPS and permission. Shoot with the normal camera app: the checklist above still applies, then hit <b>Mark done</b>.</span>`;
     $("#lockManual").classList.remove("hidden"); }
 };
 $("#snap").onclick=()=>{
@@ -184,7 +184,7 @@ $("#snap").onclick=()=>{
 };
 function doLock(){
   if(RES.locked) return;
-  if(!lockSession(D,RES.id,RES.payers)){alert("Could not save — storage may be full.");return}
+  if(!lockSession(D,RES.id,RES.payers)){alert("Could not save: storage may be full.");return}
   const id=RES.id; PLAN=allocate(D);
   boot(); $("#pick").value=id; 
 }

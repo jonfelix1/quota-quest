@@ -1,5 +1,5 @@
-const V="quotaquest-v7";
-const ASSETS=["./","index.html","callsheet.html","alloc.js","manifest.webmanifest",
+const V="quotaquest-v9";
+const ASSETS=["./","index.html","alloc.js","manifest.webmanifest",
   "icon-192.png","icon-512.png","icon-maskable-512.png","favicon.svg","logo.svg","apple-touch-icon.png"];
 self.addEventListener("install",e=>{
   e.waitUntil(caches.open(V).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));
@@ -14,6 +14,6 @@ self.addEventListener("fetch",e=>{
   e.respondWith(
     fetch(e.request).then(r=>{
       const cp=r.clone(); caches.open(V).then(c=>c.put(e.request,cp)); return r;
-    }).catch(()=>caches.match(e.request).then(r=>r||caches.match("callsheet.html")))
+    }).catch(()=>caches.match(e.request).then(r=>r||caches.match("index.html")))
   );
 });

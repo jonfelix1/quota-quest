@@ -1,8 +1,8 @@
 {
-  "name": "Quota Quest — Team Up! allocator",
+  "name": "Quota Quest: Team Up! allocator",
   "short_name": "Quota Quest",
   "description": "Plan Team Up! reimbursement funders and know who must be in the proof photo.",
-  "start_url": "callsheet.html",
+  "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
@@ -15,7 +15,6 @@
     {"src":"icon-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
   ],
   "shortcuts": [
-    {"name":"Photo call sheet","url":"callsheet.html"},
     {"name":"Planner","url":"index.html"}
   ]
 }

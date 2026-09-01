@@ -127,7 +127,7 @@ function parseImport(text) {
   let j;
   try { j = JSON.parse(text) } catch (e) { return { error: "Not valid JSON: " + e.message } }
   if (!j || typeof j !== "object") return { error: "File is not a Quota Quest export." };
-  if (j.tag && j.tag !== FILE_TAG) return { error: `Wrong file — tagged "${j.tag}".` };
+  if (j.tag && j.tag !== FILE_TAG) return { error: `Wrong file: tagged "${j.tag}".` };
   if (!Array.isArray(j.roster) || !Array.isArray(j.sessions))
     return { error: "Missing roster or sessions array." };
 
@@ -136,7 +136,7 @@ function parseImport(text) {
     const name = String(r?.name ?? "").trim();
     if (!name || seen.has(name)) continue;
     seen.add(name);
-    roster.push({ name, dept: String(r?.dept ?? "—").trim() || "—" });
+    roster.push({ name, dept: String(r?.dept ?? "").trim() || "" });
   }
   if (!roster.length) return { error: "Roster is empty." };
 
