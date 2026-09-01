@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quota Quest</title>
+<style>
+:root{
+  --bg:#f7f7f5; --card:#fff; --ink:#1c1b19; --mute:#6b6862; --line:#e3e0da;
+  --accent:#2f6f4f; --accent-soft:#e6f0ea; --warn:#8a4b12; --warn-soft:#fdf0e2;
+  --bad:#8c2f2f; --bad-soft:#fbe9e9;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#16171a; --card:#1e2024; --ink:#eceae6; --mute:#9d9a94; --line:#32353b;
+  --accent:#7fc79f; --accent-soft:#1f2f27; --warn:#e0a86a; --warn-soft:#2e2519;
+  --bad:#e88b8b; --bad-soft:#301e1e;
+}}
+:root[data-theme=dark]{
+  --bg:#16171a; --card:#1e2024; --ink:#eceae6; --mute:#9d9a94; --line:#32353b;
+  --accent:#7fc79f; --accent-soft:#1f2f27; --warn:#e0a86a; --warn-soft:#2e2519;
+  --bad:#e88b8b; --bad-soft:#301e1e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1060px;margin:0 auto;padding:28px 20px 80px}
+h1{font-size:26px;margin:0 0 4px;letter-spacing:-.02em}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);margin:0 0 12px}
+.sub{color:var(--mute);margin:0 0 26px;max-width:64ch}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:18px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.scroll{overflow-x:auto}
+input,select,textarea,button{font:inherit;color:inherit}
+input,select,textarea{background:transparent;border:1px solid var(--line);border-radius:6px;padding:5px 7px}
+textarea{width:100%;min-height:150px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+button{background:var(--accent);color:var(--bg);border:0;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:600}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;background:var(--accent-soft);color:var(--accent);margin:1px 2px 1px 0}
+.k{font-variant-numeric:tabular-nums}
+.note{font-size:13px;padding:8px 11px;border-radius:7px;margin:6px 0}
+.note.warn{background:var(--warn-soft);color:var(--warn)}
+.note.bad{background:var(--bad-soft);color:var(--bad)}
+.note.ok{background:var(--accent-soft);color:var(--accent)}
+.bar{height:7px;border-radius:99px;background:var(--line);overflow:hidden;min-width:70px}
+.bar>i{display:block;height:100%;background:var(--accent)}
+details summary{cursor:pointer;color:var(--mute);font-size:13px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+code{font-family:ui-monospace,Menlo,monospace;font-size:.92em;background:var(--accent-soft);padding:1px 4px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Quota Quest</h1>
+<p class="sub">Team Up! budget allocator. Each session is funded by a chosen subset of its attendees, so a squad that plays 3&times;/month still gets every session reimbursed — rotate whose quarterly allowance pays.</p>
+
+<div class="card">
+  <h2>Rules encoded</h2>
+  <table id="rulesTbl"></table>
+</div>
+
+<div class="card">
+  <h2>Input</h2>
+  <div class="grid2">
+    <div>
+      <label style="font-size:13px;color:var(--mute)">Roster — <code>Name, Department</code> per line</label>
+      <textarea id="roster"></textarea>
+    </div>
+    <div>
+      <label style="font-size:13px;color:var(--mute)">Sessions — <code>YYYY-MM-DD | cost | Name, Name, ...</code></label>
+      <textarea id="sessions"></textarea>
+    </div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button id="run">Allocate</button>
+    <button class="ghost" id="demo">Load example</button>
+    <label style="font-size:13px;color:var(--mute)">Quarter cap
+      <input id="cap" class="k" style="width:110px" value="1200000"></label>
+    <label style="font-size:13px;color:var(--mute)">Max activities funded / person / quarter
+      <input id="maxAct" class="k" style="width:52px" value="3"></label>
+  </div>
+</div>
+
+<div id="out"></div>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const fmt=n=>"IDR "+Math.round(n).toLocaleString("en-US");
+const q=d=>d.slice(0,4)+"-Q"+(Math.floor((+d.slice(5,7)-1)/3)+1);
+const mo=d=>d.slice(0,7);
+
+const RULES=[
+ ["Eligibility","Permanent, contract, probation — all eligible. Roster = eligible list."],
+ ["Session validity","&ge; 4 employees present, from &ge; 2 departments."],
+ ["Monthly path","1 funded activity per employee per month (allowance = cap / 3)."],
+ ["Quarterly path","Accumulate up to 3 months of allowance in one quarter, spend on 1–3 activities."],
+ ["Hard cap","Max total claim per employee per quarter = quarter cap."],
+ ["No carry-over","Unused allowance dies at quarter end. Each quarter solved on its own."],
+];
+$("#rulesTbl").innerHTML="<tr><th>Rule</th><th>Interpretation</th></tr>"+
+  RULES.map(([a,b])=>`<tr><td style="white-space:nowrap">${a}</td><td>${b}</td></tr>`).join("");
+
+const DEMO_R=`Andi, Engineering
+Budi, Engineering
+Citra, Product
+Dewi, Product
+Eka, Finance
+Fajar, Marketing
+Gita, Engineering
+Hadi, Finance`;
+const DEMO_S=`2026-07-05 | 800000 | Andi, Budi, Citra, Dewi, Eka, Fajar
+2026-07-19 | 800000 | Andi, Budi, Citra, Dewi, Gita, Hadi
+2026-08-02 | 800000 | Andi, Budi, Citra, Dewi, Eka, Fajar
+2026-08-16 | 800000 | Andi, Budi, Citra, Eka, Fajar, Gita
+2026-09-06 | 800000 | Andi, Budi, Dewi, Eka, Gita, Hadi
+2026-09-20 | 800000 | Andi, Citra, Dewi, Fajar, Gita, Hadi`;
+
+$("#demo").onclick=()=>{$("#roster").value=DEMO_R;$("#sessions").value=DEMO_S;run()};
+
+function parse(){
+  const dept={},errs=[];
+  $("#roster").value.split("\n").map(l=>l.trim()).filter(Boolean).forEach((l,i)=>{
+    const p=l.split(",").map(s=>s.trim());
+    if(p.length<2||!p[0]) return errs.push(`Roster line ${i+1}: need "Name, Department"`);
+    dept[p[0]]=p.slice(1).join(", ");
+  });
+  const ses=[];
+  $("#sessions").value.split("\n").map(l=>l.trim()).filter(Boolean).forEach((l,i)=>{
+    const p=l.split("|").map(s=>s.trim());
+    if(p.length<3) return errs.push(`Session line ${i+1}: need "date | cost | names"`);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(p[0])) return errs.push(`Session line ${i+1}: bad date "${p[0]}"`);
+    const cost=Number(p[1].replace(/[^\d.]/g,""));
+    if(!cost) return errs.push(`Session line ${i+1}: bad cost "${p[1]}"`);
+    const who=p[2].split(",").map(s=>s.trim()).filter(Boolean);
+    who.filter(w=>!(w in dept)).forEach(w=>errs.push(`Session line ${i+1}: "${w}" not in roster`));
+    ses.push({id:i+1,date:p[0],cost,who:who.filter(w=>w in dept)});
+  });
+  return {dept,ses,errs};
+}
+
+// Greedy allocator, per quarter. Pay session from attendees with most headroom
+// (headroom = remaining money, gated by remaining activity slots).
+function allocate({dept,ses},cap,maxAct){
+  const monthly=cap/maxAct;
+  const st={}; // name -> {byQ:{q:{spent,acts:Set}}}
+  const head=(n,Q)=>{const s=(st[n]?.[Q])||{spent:0,acts:new Set()};
+    return {rem:cap-s.spent, slots:maxAct-s.acts.size, s};};
+  const out=[];
+  for(const x of [...ses].sort((a,b)=>a.date<b.date?-1:1)){
+    const Q=q(x.date), M=mo(x.date);
+    const flags=[];
+    const depts=new Set(x.who.map(w=>dept[w]));
+    if(x.who.length<4) flags.push(`only ${x.who.length} employees (need 4)`);
+    if(depts.size<2) flags.push(`only ${depts.size} department (need 2)`);
+    if(flags.length){out.push({...x,Q,M,valid:false,flags,payers:[],covered:0});continue}
+
+    // candidates: attendee usable amount this session
+    const cands=x.who.map(n=>{
+      const h=head(n,Q);
+      const usableSlot=h.s.acts.has(M)?0:1; // one funded activity per month per person
+      const canPayMonthly=h.s.acts.has(M)?0:monthly;
+      return {n,...h,canMonthly:canPayMonthly,usableSlot};
+    }).filter(c=>c.slots>0 && c.rem>0 && c.usableSlot>0)
+      .sort((a,b)=>b.rem-a.rem || a.n.localeCompare(b.n));
+
+    let left=x.cost, payers=[];
+    for(const c of cands){
+      if(left<=1e-6) break;
+      const pay=Math.min(left,c.rem);
+      if(pay<=0) continue;
+      payers.push({n:c.n,pay});
+      left-=pay;
+    }
+    for(const p of payers){
+      st[p.n]=st[p.n]||{};
+      const s=st[p.n][Q]=st[p.n][Q]||{spent:0,acts:new Set()};
+      s.spent+=p.pay; s.acts.add(M);
+    }
+    const covered=x.cost-left;
+    out.push({...x,Q,M,valid:true,flags:[],payers,covered,short:left});
+  }
+  return {out,st};
+}
+
+function render(){
+  const P=parse(),cap=Number($("#cap").value)||1200000,maxAct=Math.max(1,Number($("#maxAct").value)||3);
+  const o=$("#out");
+  if(P.errs.length){o.innerHTML=`<div class="card"><h2>Input errors</h2>`+
+    P.errs.map(e=>`<div class="note bad">${e}</div>`).join("")+`</div>`;return}
+  if(!P.ses.length){o.innerHTML=`<div class="card"><p style="color:var(--mute);margin:0">No sessions yet. Load the example to see it work.</p></div>`;return}
+  const {out,st}=allocate(P,cap,maxAct);
+
+  const totCost=out.reduce((a,s)=>a+s.cost,0), totCov=out.reduce((a,s)=>a+s.covered,0);
+  let h=`<div class="card"><h2>Result</h2>
+   <div class="row" style="gap:26px">
+     <div><div style="font-size:12px;color:var(--mute)">Total session cost</div><div class="k" style="font-size:19px">${fmt(totCost)}</div></div>
+     <div><div style="font-size:12px;color:var(--mute)">Reimbursed</div><div class="k" style="font-size:19px;color:var(--accent)">${fmt(totCov)}</div></div>
+     <div><div style="font-size:12px;color:var(--mute)">Out of pocket</div><div class="k" style="font-size:19px">${fmt(totCost-totCov)}</div></div>
+     <div><div style="font-size:12px;color:var(--mute)">Coverage</div><div class="k" style="font-size:19px">${totCost?Math.round(totCov/totCost*100):0}%</div></div>
+   </div></div>`;
+
+  h+=`<div class="card"><h2>Funding plan</h2><div class="scroll"><table>
+    <tr><th>#</th><th>Date</th><th>Cost</th><th>Attendees</th><th>Funded by</th><th>Status</th></tr>`;
+  for(const s of out){
+    const status = !s.valid ? `<span class="note bad" style="display:inline-block;margin:0">Not eligible: ${s.flags.join("; ")}</span>`
+      : s.short>1 ? `<span class="note warn" style="display:inline-block;margin:0">Short ${fmt(s.short)}</span>`
+      : `<span class="note ok" style="display:inline-block;margin:0">Fully covered</span>`;
+    h+=`<tr><td class="k">${s.id}</td><td style="white-space:nowrap">${s.date}</td><td class="k">${fmt(s.cost)}</td>
+      <td>${s.who.map(w=>`<span class="pill" title="${P.dept[w]}">${w}</span>`).join("")}</td>
+      <td>${s.payers.length?s.payers.map(p=>`${p.n} <span class="k" style="color:var(--mute)">${fmt(p.pay)}</span>`).join("<br>"):"&mdash;"}</td>
+      <td>${status}</td></tr>`;
+  }
+  h+=`</table></div></div>`;
+
+  const quarters=[...new Set(out.map(s=>s.Q))].sort();
+  for(const Q of quarters){
+    h+=`<div class="card"><h2>Quota usage &mdash; ${Q}</h2><div class="scroll"><table>
+      <tr><th>Employee</th><th>Dept</th><th>Claimed</th><th>Remaining</th><th>Activities funded</th><th></th></tr>`;
+    for(const n of Object.keys(P.dept)){
+      const s=st[n]?.[Q]||{spent:0,acts:new Set()};
+      const pct=Math.min(100,s.spent/cap*100);
+      h+=`<tr><td>${n}</td><td style="color:var(--mute)">${P.dept[n]}</td>
+        <td class="k">${fmt(s.spent)}</td><td class="k">${fmt(cap-s.spent)}</td>
+        <td class="k">${s.acts.size} / ${maxAct} <span style="color:var(--mute)">(${[...s.acts].sort().join(", ")||"—"})</span></td>
+        <td style="width:120px"><div class="bar"><i style="width:${pct}%"></i></div></td></tr>`;
+    }
+    h+=`</table></div></div>`;
+  }
+
+  h+=`<div class="card"><details><summary>How the allocator decides</summary>
+   <p style="font-size:14px;color:var(--mute)">Sessions processed oldest first. For each eligible session, candidate funders =
+   attendees who (a) have quarter budget left, (b) have an activity slot left, and (c) have not already funded an activity
+   that calendar month. Candidates sorted by remaining budget, descending; each pays up to its remainder until the session
+   cost is met. Greedy — good plans, not provably optimal. Quarters never share budget.</p></details></div>`;
+  o.innerHTML=h;
+}
+const run=render;
+$("#run").onclick=run;
+["cap","maxAct"].forEach(i=>$("#"+i).oninput=run);
+$("#demo").click();
+</script>
+</body>
+</html>
